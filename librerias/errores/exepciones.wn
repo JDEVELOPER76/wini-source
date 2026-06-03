@@ -1,0 +1,83 @@
+# exepciones.wn - Módulo de errores personalizados
+
+# ==============================================================================
+# 💡 ERRORES NATIVOS DEL INTÉRPRETE (Disponibles globalmente sin importar nada)
+# ==============================================================================
+# # ErrorTipo:       Ocurre al usar tipos incompatibles (ej. "hola" + 5).
+# # ErrorValor:      Valor con tipo correcto pero inválido (ej. entero("texto")).
+# # ErrorIndice:     Índice fuera de rango en listas o clave inexistente en dicts.
+# # ErrorAtributo:   Se intenta acceder a una variable o método que no existe.
+# # ErrorImportacion:Fallo al cargar o encontrar un módulo o paquete.
+# # ErrorMatematico: Errores aritméticos internos del motor.
+# # RuntimeError:    Error genérico en tiempo de ejecución.
+# ==============================================================================
+
+clase ErrorBase:
+    funcion constructor(mensaje):
+        yo.mensaje = mensaje
+    fin
+fin
+
+# --- Errores Originales ---
+
+clase ErrorValidacion(ErrorBase):
+    funcion constructor(mensaje):
+        yo.mensaje = mensaje
+    fin
+fin
+
+clase ErrorConexion(ErrorBase):
+    funcion constructor(mensaje):
+        yo.mensaje = mensaje
+    fin
+fin
+
+clase ErrorPermiso(ErrorBase):
+    funcion constructor(mensaje):
+        yo.mensaje = mensaje
+    fin
+fin
+
+clase DivisionEntre0(ErrorBase):
+    funcion constructor(mensaje):
+        yo.mensaje = mensaje
+    fin
+fin
+
+
+# --- 🚀 NUEVOS ERRORES PERSONALIZADOS ---
+
+clase ErrorArchivoNoEncontrado(ErrorBase):
+    """Ocurre cuando se intenta abrir o manipular un archivo que no existe"""
+    funcion constructor(mensaje):
+        yo.mensaje = mensaje
+    fin
+fin
+
+clase ErrorNoEncontrado(ErrorBase):
+    """Para elementos, usuarios o registros específicos que no existen en un sistema"""
+    funcion constructor(mensaje):
+        yo.mensaje = mensaje
+    fin
+fin
+
+clase ErrorBaseDatos(ErrorBase):
+    """Para fallos en consultas, operaciones de guardado o transacciones"""
+    funcion constructor(mensaje):
+        yo.mensaje = mensaje
+    fin
+fin
+
+clase ErrorDesbordamiento(ErrorBase):
+    """Para cuando un cálculo u operación supera los límites máximos permitidos"""
+    funcion constructor(mensaje):
+        yo.mensaje = mensaje
+    fin
+fin
+
+clase ErrorFormato(ErrorBase):
+    """Especial para estructuras de datos corruptas o inválidas (ej. JSON mal armado o texto mal parseado)"""
+    funcion constructor(mensaje):
+        yo.mensaje = mensaje
+    fin
+fin

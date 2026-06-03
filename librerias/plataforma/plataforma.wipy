@@ -1,0 +1,23 @@
+from wpython import PythonAPI
+import platform
+
+
+modulo = PythonAPI("plataforma")
+
+
+@modulo.funcion
+def ObtenerSistema():
+    return platform.system()
+
+@modulo.funcion
+def ObtenerArquitectura():
+    return platform.architecture()[0]
+
+@modulo.funcion
+def ObtenerProcesador():
+    return platform.processor()
+
+@modulo.funcion
+def ObtenerVersion():
+    return platform.version()
+

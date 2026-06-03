@@ -1,0 +1,63 @@
+# matematica.wipy
+"""
+Puente que expone funciones matemáticas seleccionadas a Wini.
+Solo lo que está aquí es accesible — math completo no se filtra.
+"""
+
+import math
+from wpython import PythonAPI
+
+modulo = PythonAPI("matematica")
+
+# ── Funciones expuestas ──────────────────────────────────────────────────────
+
+@modulo.funcion
+def raiz(n):
+    """Raíz cuadrada"""
+    if n < 0:
+        raise ValueError("No se puede calcular raíz de un número negativo")
+    return math.sqrt(n)
+
+@modulo.funcion
+def potencia(base, exp):
+    """base elevado a exp"""
+    return math.pow(base, exp)
+
+@modulo.funcion
+def seno(angulo):
+    """Seno (en radianes)"""
+    return math.sin(angulo)
+
+@modulo.funcion
+def coseno(angulo):
+    """Coseno (en radianes)"""
+    return math.cos(angulo)
+
+@modulo.funcion
+def redondear(n, decimales=0):
+    """Redondea a N decimales"""
+    return round(n, int(decimales))
+
+@modulo.funcion
+def absoluto(n):
+    """Valor absoluto"""
+    return abs(n)
+
+@modulo.funcion
+def logaritmo(n, base=math.e):
+    """Logaritmo en base dada (natural por defecto)"""
+    if n <= 0:
+        raise ValueError("El logaritmo solo se define para números positivos")
+    if base <= 1:
+        raise ValueError("La base del logaritmo debe ser mayor que 1")
+    return math.log(n, base)
+
+# ── Constantes expuestas ─────────────────────────────────────────────────────
+
+modulo.constante("PI", math.pi)
+modulo.constante("E", math.e)
+modulo.constante("INF", math.inf)
+
+# NOTA: math.factorial, math.floor, math.ceil, etc. NO están expuestos
+# porque este puente no los incluyó. El usuario de Wini no puede acceder
+# a nada de math que no esté listado aquí.

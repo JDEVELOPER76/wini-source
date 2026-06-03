@@ -1,0 +1,140 @@
+from wpython import PythonAPI
+import os 
+import shutil
+
+
+
+
+modulo = PythonAPI("so")
+
+@modulo.funcion
+def EjecutarComando(comando:str):
+    if not isinstance(comando, str):
+        raise TypeError("El comando debe ser una cadena de texto.")
+    return os.system(comando)
+
+@modulo.funcion
+def CrearCarpeta(ruta:str):
+    if not isinstance(ruta, str):
+        raise TypeError("La ruta debe ser una cadena de texto.")
+    return os.mkdir(ruta)
+
+@modulo.funcion
+def EliminarCarpeta(ruta:str):
+    if not isinstance(ruta, str):
+        raise TypeError("La ruta debe ser una cadena de texto.")
+    return os.rmdir(ruta)
+
+@modulo.funcion
+def EliminarCarpetaRecursiva(ruta:str):
+    if not isinstance(ruta, str):
+        raise TypeError("La ruta debe ser una cadena de texto.")
+    return shutil.rmtree(ruta)
+
+@modulo.funcion
+def EliminarArchivo(ruta:str):
+    if not isinstance(ruta, str):
+        raise TypeError("La ruta debe ser una cadena de texto.")
+    return os.remove(ruta)
+
+@modulo.funcion
+def ListarArchivos(ruta:str):
+    if not isinstance(ruta, str):
+        raise TypeError("La ruta debe ser una cadena de texto.")
+    return os.listdir(ruta)
+
+@modulo.funcion
+def CambiarDirectorio(ruta:str):
+    if not isinstance(ruta, str):
+        raise TypeError("La ruta debe ser una cadena de texto.")
+    return os.chdir(ruta)
+
+@modulo.funcion
+def ObtenerDirectorioActual():
+    return os.getcwd()
+
+@modulo.funcion
+def RenombrarArchivo(ruta_vieja:str, ruta_nueva:str):
+    if not isinstance(ruta_vieja, str) or not isinstance(ruta_nueva, str):
+        raise TypeError("Las rutas deben ser cadenas de texto.")
+    return os.rename(ruta_vieja, ruta_nueva)
+
+@modulo.funcion
+def VerificarExistencia(ruta:str):
+    if not isinstance(ruta, str):
+        raise TypeError("La ruta debe ser una cadena de texto.")
+    return os.path.exists(ruta)
+
+@modulo.funcion
+def VerificarEsArchivo(ruta:str):
+    if not isinstance(ruta, str):
+        raise TypeError("La ruta debe ser una cadena de texto.")
+    return os.path.isfile(ruta)
+
+@modulo.funcion
+def VerificarEsCarpeta(ruta:str):
+    if not isinstance(ruta, str):
+        raise TypeError("La ruta debe ser una cadena de texto.")
+    return os.path.isdir(ruta)
+
+@modulo.funcion
+def ObtenerTamañoArchivo(ruta:str):
+    if not isinstance(ruta, str):
+        raise TypeError("La ruta debe ser una cadena de texto.")
+    return os.path.getsize(ruta)
+
+@modulo.funcion
+def ObtenerFechaModificacion(ruta:str):
+    if not isinstance(ruta, str):
+        raise TypeError("La ruta debe ser una cadena de texto.")
+    return os.path.getmtime(ruta)
+
+@modulo.funcion
+def ObtenerFechaCreacion(ruta:str):
+    if not isinstance(ruta, str):
+        raise TypeError("La ruta debe ser una cadena de texto.")
+    return os.path.getctime(ruta)
+
+@modulo.funcion
+def ObtenerRutaAbmoduloluta(ruta:str):
+    if not isinstance(ruta, str):
+        raise TypeError("La ruta debe ser una cadena de texto.")
+    return os.path.abspath(ruta)
+
+@modulo.funcion
+def ObtenerRutaRelativa(ruta:str):
+    if not isinstance(ruta, str):
+        raise TypeError("La ruta debe ser una cadena de texto.")
+    return os.path.relpath(ruta)
+
+@modulo.funcion
+def ObtenerNombreArchivo(ruta:str):
+    if not isinstance(ruta, str):
+        raise TypeError("La ruta debe ser una cadena de texto.")
+    return os.path.basename(ruta)
+
+@modulo.funcion
+def ObtenerDirectorioArchivo(ruta:str):
+    if not isinstance(ruta, str):
+        raise TypeError("La ruta debe ser una cadena de texto.")
+    return os.path.dirname(ruta)
+
+@modulo.funcion
+def ObtenerExtensionArchivo(ruta:str):
+    if not isinstance(ruta, str):
+        raise TypeError("La ruta debe ser una cadena de texto.")
+    return os.path.splitext(ruta)[1]
+
+@modulo.funcion
+def ObtenerNombreSinExtension(ruta:str):
+    if not isinstance(ruta, str):
+        raise TypeError("La ruta debe ser una cadena de texto.")
+    return os.path.splitext(os.path.basename(ruta))[0]
+
+
+@modulo.funcion
+def ObtenerVariableEntorno(nombre:str):
+    if not isinstance(nombre, str):
+        raise TypeError("El nombre de la variable de entorno debe ser una cadena de texto.")
+    return os.environ.get(nombre)
+

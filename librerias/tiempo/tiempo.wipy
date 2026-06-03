@@ -1,0 +1,370 @@
+# tiempo.wipy
+"""Módulo de tiempo para Wini - Proporciona funciones para trabajar con tiempo y fechas"""
+
+from wpython import PythonAPI
+import time
+import datetime
+import calendar
+
+modulo = PythonAPI("tiempo")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FUNCIONES DE ESPERA Y PAUSA
+# ─────────────────────────────────────────────────────────────────────────────
+
+@modulo.funcion
+def Esperar(segundos):
+    """
+    Pausa la ejecución durante el número especificado de segundos
+    
+    📌 Ejemplo:
+        tiempo.Esperar(2)      # Espera 2 segundos
+        tiempo.Esperar(0.5)    # Espera medio segundo
+    """
+    if isinstance(segundos, (int, float)):
+        time.sleep(segundos)
+    else:
+        raise TypeError(f"Esperar() espera un número, recibió {type(segundos)}")
+
+@modulo.funcion
+def EsperarMilisegundos(milisegundos):
+    """
+    Pausa la ejecución durante milisegundos (1 segundo = 1000 milisegundos)
+    
+    📌 Ejemplo:
+        tiempo.EsperarMilisegundos(500)  # Espera medio segundo
+        tiempo.EsperarMilisegundos(1000) # Espera 1 segundo
+    """
+    if isinstance(milisegundos, (int, float)):
+        time.sleep(milisegundos / 1000.0)
+    else:
+        raise TypeError(f"EsperarMilisegundos() espera un número, recibió {type(milisegundos)}")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FUNCIONES DE TIEMPO ACTUAL
+# ─────────────────────────────────────────────────────────────────────────────
+
+@modulo.funcion
+def Ahora():
+    """
+    Devuelve la fecha y hora actual como texto legible
+    
+    📌 Ejemplo:
+        actual = tiempo.Ahora()
+        escribir(actual)  # "2026-06-02 15:30:45"
+    """
+    return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+@modulo.funcion
+def SegundosDesde1970():
+    """
+    Devuelve los segundos transcurridos desde el 1 de enero de 1970
+    (Esto se llama "timestamp" en programación)
+    
+    Útil para:
+        - Medir tiempos con precisión
+        - Ordenar eventos
+        - Calcular diferencias de tiempo
+    
+    📌 Ejemplo:
+        inicio = tiempo.SegundosDesde1970()
+        tiempo.Esperar(2)
+        fin = tiempo.SegundosDesde1970()
+        escribir("Pasaron: " + (fin - inicio) + " segundos")
+    """
+    return time.time()
+
+@modulo.funcion
+def MilisegundosDesde1970():
+    """
+    Devuelve los milisegundos transcurridos desde el 1 de enero de 1970
+    (Más preciso que SegundosDesde1970)
+    
+    📌 Ejemplo:
+        inicio = tiempo.MilisegundosDesde1970()
+        # ... código rápido ...
+        fin = tiempo.MilisegundosDesde1970()
+        escribir("Pasaron: " + (fin - inicio) + " milisegundos")
+    """
+    return int(time.time() * 1000)
+
+@modulo.funcion
+def HoraActual():
+    """
+    Devuelve solo la hora actual (sin fecha)
+    
+    📌 Ejemplo:
+        hora = tiempo.HoraActual()  # "15:30:45"
+        escribir("Son las " + hora)
+    """
+    return datetime.datetime.now().strftime("%H:%M:%S")
+
+@modulo.funcion
+def FechaActual():
+    """
+    Devuelve solo la fecha actual (sin hora)
+    
+    📌 Ejemplo:
+        hoy = tiempo.FechaActual()  # "2026-06-02"
+        escribir("Hoy es " + hoy)
+    """
+    return datetime.datetime.now().strftime("%Y-%m-%d")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FUNCIONES DE CRONÓMETRO (Para medir tiempos)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@modulo.funcion
+def CronometroIniciar():
+    """
+    Crea y inicia un cronómetro para medir tiempos
+    
+    📌 Ejemplo:
+        crono = tiempo.CronometroIniciar()
+        tiempo.Esperar(2.5)
+        escribir("Tiempo: " + tiempo.CronometroObtener(crono) + " segundos")
+        total = tiempo.CronometroDetener(crono)
+    """
+    return {"inicio": time.time(), "activo": True}
+
+@modulo.funcion
+def CronometroObtener(cronometro):
+    """
+    Obtiene el tiempo actual del cronómetro sin detenerlo
+    
+    📌 Ejemplo:
+        crono = tiempo.CronometroIniciar()
+        tiempo.Esperar(1)
+        escribir("Va " + tiempo.CronometroObtener(crono) + " segundos")
+        tiempo.Esperar(1)
+        escribir("Total " + tiempo.CronometroObtener(crono) + " segundos")
+    """
+    if cronometro and cronometro.get("activo"):
+        return time.time() - cronometro["inicio"]
+    return 0
+
+@modulo.funcion
+def CronometroDetener(cronometro):
+    """
+    Detiene el cronómetro y devuelve el tiempo total
+    
+    📌 Ejemplo:
+        crono = tiempo.CronometroIniciar()
+        tiempo.Esperar(3)
+        total = tiempo.CronometroDetener(crono)
+        escribir("Tardó: " + total + " segundos")
+    """
+    if cronometro and cronometro.get("activo"):
+        elapsed = time.time() - cronometro["inicio"]
+        cronometro["activo"] = False
+        return elapsed
+    return 0
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FUNCIONES DE CONVERSIÓN DE TIEMPO
+# ─────────────────────────────────────────────────────────────────────────────
+
+@modulo.funcion
+def SegundosAHoras(segundos):
+    """
+    Convierte segundos a horas
+    
+    📌 Ejemplo:
+        horas = tiempo.SegundosAHoras(7200)  # 2.0 horas
+    """
+    return segundos / 3600.0
+
+@modulo.funcion
+def SegundosADias(segundos):
+    """
+    Convierte segundos a días
+    
+    📌 Ejemplo:
+        dias = tiempo.SegundosADias(172800)  # 2.0 días
+    """
+    return segundos / 86400.0
+
+@modulo.funcion
+def FormatearTiempo(segundos):
+    """
+    Convierte segundos a formato legible HH:MM:SS
+    
+    📌 Ejemplo:
+        texto = tiempo.FormatearTiempo(3665)  # "01:01:05"
+        escribir("Tiempo: " + texto)
+    """
+    horas = int(segundos // 3600)
+    minutos = int((segundos % 3600) // 60)
+    segs = int(segundos % 60)
+    return f"{horas:02d}:{minutos:02d}:{segs:02d}"
+
+@modulo.funcion
+def TextoASegundos(texto_tiempo):
+    """
+    Convierte texto en formato HH:MM:SS o MM:SS a segundos
+    
+    📌 Ejemplo:
+        segundos = tiempo.TextoASegundos("01:30:00")  # 5400 segundos
+        segundos = tiempo.TextoASegundos("02:30")     # 150 segundos
+    """
+    partes = texto_tiempo.split(":")
+    if len(partes) == 2:
+        minutos, segundos = partes
+        return int(minutos) * 60 + int(segundos)
+    elif len(partes) == 3:
+        horas, minutos, segundos = partes
+        return int(horas) * 3600 + int(minutos) * 60 + int(segundos)
+    else:
+        raise ValueError(f"Formato inválido: {texto_tiempo}. Use HH:MM:SS o MM:SS")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FUNCIONES DE FECHAS
+# ─────────────────────────────────────────────────────────────────────────────
+
+@modulo.funcion
+def NumeroAFecha(numero_segundos):
+    """
+    Convierte un número de segundos desde 1970 a una fecha legible
+    
+    📌 Ejemplo:
+        fecha = tiempo.NumeroAFecha(1717354245)
+        escribir(fecha)  # "2026-06-02 15:30:45"
+    """
+    return datetime.datetime.fromtimestamp(numero_segundos).strftime("%Y-%m-%d %H:%M:%S")
+
+@modulo.funcion
+def FechaANumero(texto_fecha):
+    """
+    Convierte una fecha en texto a número de segundos desde 1970
+    
+    📌 Ejemplo:
+        segundos = tiempo.FechaANumero("2026-06-02 15:30:45")
+        escribir(segundos)  # 1717354245.0
+    """
+    if " " in texto_fecha:
+        dt = datetime.datetime.strptime(texto_fecha, "%Y-%m-%d %H:%M:%S")
+    else:
+        dt = datetime.datetime.strptime(texto_fecha, "%Y-%m-%d")
+    return dt.timestamp()
+
+@modulo.funcion
+def DiasEntreFechas(fecha1, fecha2):
+    """
+    Calcula los días entre dos fechas
+    
+    📌 Ejemplo:
+        dias = tiempo.DiasEntreFechas("2026-06-01", "2026-06-15")
+        escribir("Diferencia: " + dias + " días")  # 14 días
+    """
+    dt1 = datetime.datetime.strptime(fecha1, "%Y-%m-%d")
+    dt2 = datetime.datetime.strptime(fecha2, "%Y-%m-%d")
+    return abs((dt2 - dt1).days)
+
+@modulo.funcion
+def SumarDias(fecha, dias):
+    """
+    Suma o resta días a una fecha
+    
+    📌 Ejemplo:
+        manana = tiempo.SumarDias("2026-06-02", 1)   # "2026-06-03"
+        ayer = tiempo.SumarDias("2026-06-02", -1)    # "2026-06-01"
+    """
+    dt = datetime.datetime.strptime(fecha, "%Y-%m-%d")
+    nueva = dt + datetime.timedelta(days=dias)
+    return nueva.strftime("%Y-%m-%d")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FUNCIONES DE CALENDARIO
+# ─────────────────────────────────────────────────────────────────────────────
+
+@modulo.funcion
+def NombreDiaSemana(fecha=None):
+    """
+    Obtiene el nombre del día de la semana
+    
+    📌 Ejemplo:
+        hoy = tiempo.NombreDiaSemana()           # "martes"
+        dia = tiempo.NombreDiaSemana("2026-06-01") # "lunes"
+    """
+    if fecha is None:
+        dt = datetime.datetime.now()
+    else:
+        dt = datetime.datetime.strptime(fecha, "%Y-%m-%d")
+    
+    dias = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+    return dias[dt.weekday()]
+
+@modulo.funcion
+def NumeroSemana(fecha=None):
+    """
+    Obtiene el número de semana del año (1-53)
+    
+    📌 Ejemplo:
+        semana = tiempo.NumeroSemana()  # 23 (segunda semana de junio)
+    """
+    if fecha is None:
+        dt = datetime.datetime.now()
+    else:
+        dt = datetime.datetime.strptime(fecha, "%Y-%m-%d")
+    return dt.isocalendar()[1]
+
+@modulo.funcion
+def DiasEnMes(año, mes):
+    """
+    Obtiene cuántos días tiene un mes
+    
+    📌 Ejemplo:
+        dias = tiempo.DiasEnMes(2026, 2)  # 28 (febrero)
+        dias = tiempo.DiasEnMes(2026, 6)  # 30 (junio)
+    """
+    return calendar.monthrange(año, mes)[1]
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FUNCIONES PARA MEDIR RENDIMIENTO
+# ─────────────────────────────────────────────────────────────────────────────
+
+@modulo.funcion
+def IniciarMedicion():
+    """
+    Crea un temporizador para medir rendimiento de código
+    
+    📌 Ejemplo:
+        medir = tiempo.IniciarMedicion()
+        
+        # Tu código aquí
+        tiempo.Esperar(1)
+        
+        escribir("Tiempo parcial: " + tiempo.MarcarMedicion(medir))
+        # Más código...
+        escribir("Tiempo total: " + tiempo.TotalMedicion(medir))
+    """
+    return {"ultimo": time.time(), "inicio": time.time()}
+
+@modulo.funcion
+def MarcarMedicion(temporizador):
+    """
+    Marca un punto en la medición y devuelve tiempo desde la última marca
+    
+    📌 Ejemplo:
+        medir = tiempo.IniciarMedicion()
+        # código 1
+        escribir("Paso 1: " + tiempo.MarcarMedicion(medir) + " segundos")
+        # código 2
+        escribir("Paso 2: " + tiempo.MarcarMedicion(medir) + " segundos")
+    """
+    ahora = time.time()
+    diff = ahora - temporizador["ultimo"]
+    temporizador["ultimo"] = ahora
+    return diff
+
+@modulo.funcion
+def TotalMedicion(temporizador):
+    """
+    Obtiene el tiempo total desde que se inició la medición
+    
+    📌 Ejemplo:
+        medir = tiempo.IniciarMedicion()
+        # ... todo el código ...
+        escribir("Total: " + tiempo.TotalMedicion(medir) + " segundos")
+    """
+    return time.time() - temporizador["inicio"]
