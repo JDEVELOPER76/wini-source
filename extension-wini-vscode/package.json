@@ -1,0 +1,48 @@
+{
+  "name": "wini-languagebyjd",
+  "displayName": "Wini Completion Lang Support",
+  "description": "Soporte completo para el lenguaje Wini (.wn)",
+  "version": "0.2.0",
+  "publisher": "Jdeveloper",
+  "icon":"icons/icono.png",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Programming Languages"],
+  "activationEvents": ["onLanguage:wini"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "wini",
+        "aliases": ["Wini", "wini"],
+        "extensions": [".wn", ".wipy"],
+        "configuration": "./language-configuration.json",
+        "icon": {"dark": "icons/icono.png","light": "icons/icono.png"}
+      }
+    ],
+    "grammars": [
+      {
+        "language": "wini",
+        "scopeName": "source.wini",
+        "path": "./syntaxes/wini.tmGrammar.json"
+      }
+    ],
+    "themes":[{
+      "label": "Wini dark",
+      "uiTheme": "vs-dark",
+      "path": "./temas/wini-color-theme.json"
+    }]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.3.0",
+    "@vscode/vsce": "^2.24.0"
+  }
+}

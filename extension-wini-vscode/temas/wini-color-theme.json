@@ -1,0 +1,123 @@
+{
+  "name": "Wini Dark",
+  "type": "dark",
+  "colors": {},
+  "tokenColors": [
+    {
+      "name": "Letra 'c' de interpolación",
+      "scope": "keyword.interpolated.prefix.wini",
+      "settings": {
+        "foreground": "#6a9955",
+        "fontStyle": "bold"
+      }
+    },
+    {
+      "name": "Comillas de la cadena interpolada",
+      "scope": "punctuation.definition.string.begin.wini, punctuation.definition.string.end.wini",
+      "settings": {
+        "foreground": "#797cdb"
+      }
+    },
+    {
+      "name": "Cadena interpolada (texto normal)",
+      "scope": "string.interpolated.wini",
+      "settings": {
+        "foreground": "#ce9178"
+      }
+    },
+    {
+      "name": "Variables interpoladas (dentro de {})",
+      "scope": "variable.other.interpolated.wini",
+      "settings": {
+        "foreground": "#3abbcc",
+        "fontStyle": "bold"
+      }
+    },
+    {
+      "name": "Llaves de interpolación {}",
+      "scope": "constant.character.escape.wini",
+      "settings": {
+        "foreground": "#d0f043"
+      }
+    },
+    {
+      "name": "Variables normales",
+      "scope": "variable.other.wini",
+      "settings": {
+        "foreground": "#9cdcfe"
+      }
+    },
+    {
+      "name": "Módulos importados",
+      "scope": "entity.name.type.module.wini",
+      "settings": {
+        "foreground": "#4ec9b0",
+        "fontStyle": "bold"
+      }
+    },
+    {
+      "name": "Palabras clave",
+      "scope": "keyword.control.wini, keyword.declaration.wini, keyword.operator.logical.wini",
+      "settings": {
+        "foreground": "#c586c0"
+      }
+    },
+    {
+      "name": "Funciones nativas",
+      "scope": "support.function.builtin.wini",
+      "settings": {
+        "foreground": "#dcdcaa"
+      }
+    },
+    {
+      "name": "Funciones definidas",
+      "scope": "entity.name.function.wini, entity.name.function.definition.wini",
+      "settings": {
+        "foreground": "#dcdcaa"
+      }
+    },
+    {
+      "name": "Clases",
+      "scope": "entity.name.type.class.wini",
+      "settings": {
+        "foreground": "#4ec9b0"
+      }
+    },
+    {
+      "name": "Constantes (verdadero, falso, nulo)",
+      "scope": "constant.language.wini",
+      "settings": {
+        "foreground": "#569cd6"
+      }
+    },
+    {
+      "name": "Cadenas normales",
+      "scope": "string.quoted.double.wini, string.quoted.single.wini",
+      "settings": {
+        "foreground": "#ce9178"
+      }
+    },
+    {
+      "name": "Números",
+      "scope": "constant.numeric.integer.wini, constant.numeric.float.wini",
+      "settings": {
+        "foreground": "#b5cea8"
+      }
+    },
+    {
+      "name": "Comentarios",
+      "scope": "comment.line.number-sign.wini",
+      "settings": {
+        "foreground": "#6a9955",
+        "fontStyle": "italic"
+      }
+    },
+    {
+      "name": "Operadores",
+      "scope": "keyword.operator.wini",
+      "settings": {
+        "foreground": "#d4d4d4"
+      }
+    }
+  ]
+}
