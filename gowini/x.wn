@@ -1,0 +1,12 @@
+importar "sistema/os.dll" como os
+
+archivo = os.leer_archivo("config.json")
+si archivo == " ":
+    escribir("No se pudo leer el archivo")
+    salir()
+
+# Reemplazar espacios con "___"
+archivo_modificado = archivo.reemplazar(" ", "___")
+
+escribir("=== ARCHIVO MODIFICADO ===")
+escribir(archivo_modificado)

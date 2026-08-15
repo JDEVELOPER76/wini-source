@@ -1,0 +1,1 @@
+#g++ -shared -o os.dll os.cpp winiapi.cpp -I. -lshlwapi -lpsapi -luser32 -lshell32 -D WINI_EXPORTS -std=c++17

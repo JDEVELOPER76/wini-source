@@ -1,0 +1,26 @@
+# ejemplo_basico.wn
+importar "json.wn" como json
+
+
+# ============ CREAR UN OBJETO JSON ============
+config = {
+    "nombre": "Mi App",
+    "version": 1.0,
+    "debug": verdadero,
+    "puerto": 8080,
+    "array": [1, 2, 3],
+    "objeto": {
+        "clave1": "valor1",
+        "clave2": "valor2"
+    },
+    "capturare": {
+        "habilitado": verdadero,
+        "nivel": 2
+    }
+}
+
+# ============ GUARDAR JSON ============
+json.guardar(config, "config.json", 2)
+escribir("Configuración guardada!")
+
+escribir(json.cargar("config.json"))

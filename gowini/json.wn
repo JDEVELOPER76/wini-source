@@ -1,0 +1,267 @@
+importar "sistema/os.dll" como os
+
+# ============ FUNCIONES DE UTILIDAD ============
+
+funcion es_diccionario(valor):
+    retornar tipo(valor) == "diccionario"
+
+funcion es_lista(valor):
+    retornar tipo(valor) == "lista"
+
+funcion es_cadena(valor):
+    retornar tipo(valor) == "cadena"
+
+funcion es_numero(valor):
+    retornar tipo(valor) == "entero" o tipo(valor) == "decimal"
+
+funcion es_booleano(valor):
+    retornar tipo(valor) == "booleano"
+
+funcion es_nulo(valor):
+    retornar tipo(valor) == "ninguno"
+
+funcion _escapar_cadena(texto):
+    resultado = texto.reemplazar("\\", "\\\\")
+    resultado = resultado.reemplazar('"', '\\"')
+    resultado = resultado.reemplazar("\n", "\\n")
+    resultado = resultado.reemplazar("\r", "\\r")
+    resultado = resultado.reemplazar("\t", "\\t")
+    retornar resultado
+
+funcion _unir(arr, separador):
+    si arr.longitud() == 0:
+        retornar ""
+    
+    resultado = texto(arr[0])
+    i = 1
+    mientras i < arr.longitud():
+        resultado = resultado + separador + texto(arr[i])
+        i = i + 1
+    retornar resultado
+
+funcion _serializar(valor, indentacion, nivel):
+    espacios = ""
+    i = 0
+    mientras i < indentacion * nivel:
+        espacios = espacios + " "
+        i = i + 1
+    
+    espacios_siguiente = ""
+    i = 0
+    mientras i < indentacion * (nivel + 1):
+        espacios_siguiente = espacios_siguiente + " "
+        i = i + 1
+    
+    si es_nulo(valor):
+        retornar "null"
+    
+    si es_booleano(valor):
+        si valor:
+            retornar "true"
+        sino:
+            retornar "false"
+    
+    si es_numero(valor):
+        retornar texto(valor)
+    
+    si es_cadena(valor):
+        retornar '"' + _escapar_cadena(valor) + '"'
+    
+    si es_lista(valor):
+        si valor.longitud() == 0:
+            retornar "[]"
+        
+        elementos = []
+        para item en valor:
+            elementos.agregar(_serializar(item, indentacion, nivel + 1))
+        
+        si indentacion > 0:
+            retornar "[\n" + espacios_siguiente + _unir(elementos, ",\n" + espacios_siguiente) + "\n" + espacios + "]"
+        sino:
+            retornar "[" + _unir(elementos, ", ") + "]"
+    
+    si es_diccionario(valor):
+        si valor.longitud() == 0:
+            retornar "{}"
+        
+        pares = []
+        claves = valor.claves()
+        
+        # Ordenar claves con método de burbuja
+        i = 0
+        mientras i < claves.longitud():
+            j = i + 1
+            mientras j < claves.longitud():
+                si texto(claves[i]) > texto(claves[j]):
+                    temp = claves[i]
+                    claves[i] = claves[j]
+                    claves[j] = temp
+                j = j + 1
+            i = i + 1
+        
+        para clave en claves:
+            clave_json = _serializar(clave, indentacion, 0)
+            valor_json = _serializar(valor[clave], indentacion, nivel + 1)
+            pares.agregar(clave_json + ": " + valor_json)
+        
+        si indentacion > 0:
+            retornar "{\n" + espacios_siguiente + _unir(pares, ",\n" + espacios_siguiente) + "\n" + espacios + "}"
+        sino:
+            retornar "{" + _unir(pares, ", ") + "}"
+    
+    retornar texto(valor)
+
+funcion serializar(valor, indentacion=0):
+    retornar _serializar(valor, indentacion, 0)
+
+funcion guardar(valor, archivo, indentacion=2):
+    texto_json = serializar(valor, indentacion)
+    exito = os.escribir_archivo(archivo, texto_json)
+    si no exito:
+        lanzar("No se pudo guardar el archivo: " + archivo)
+    retornar verdadero
+
+# ============ PARSER JSON ============
+
+funcion _saltar_espacios(texto, posicion):
+    mientras posicion < texto.longitud() y (texto[posicion] == " " o texto[posicion] == "\n" o texto[posicion] == "\t" o texto[posicion] == "\r"):
+        posicion = posicion + 1
+    retornar posicion
+
+funcion _parsear_null(texto, posicion):
+    si texto[posicion] == "n" y texto[posicion + 1] == "u" y texto[posicion + 2] == "l" y texto[posicion + 3] == "l":
+        retornar [nulo, posicion + 4]
+    retornar [nulo, posicion]
+
+funcion _parsear_booleano(texto, posicion):
+    si texto[posicion] == "t" y texto[posicion + 1] == "r" y texto[posicion + 2] == "u" y texto[posicion + 3] == "e":
+        retornar [verdadero, posicion + 4]
+    si texto[posicion] == "f" y texto[posicion + 1] == "a" y texto[posicion + 2] == "l" y texto[posicion + 3] == "s" y texto[posicion + 4] == "e":
+        retornar [falso, posicion + 5]
+    retornar [nulo, posicion]
+
+funcion _parsear_numero(texto, posicion):
+    inicio = posicion
+    tiene_punto = falso
+    mientras posicion < texto.longitud():
+        caracter = texto[posicion]
+        si caracter >= "0" y caracter <= "9":
+            posicion = posicion + 1
+        sino si caracter == ".":
+            tiene_punto = verdadero
+            posicion = posicion + 1
+        sino si caracter == "-":
+            posicion = posicion + 1
+        sino:
+            romper
+    numero = texto.extraer(inicio, posicion)
+    si tiene_punto:
+        retornar [numero.a_decimal(), posicion]
+    sino:
+        retornar [numero.a_entero(), posicion]
+
+funcion _parsear_cadena(texto, posicion):
+    posicion = posicion + 1
+    resultado = ""
+    mientras posicion < texto.longitud():
+        si texto[posicion] == '"':
+            posicion = posicion + 1
+            retornar [resultado, posicion]
+        si texto[posicion] == "\\" y posicion + 1 < texto.longitud():
+            siguiente = texto[posicion + 1]
+            si siguiente == "n":
+                resultado = resultado + "\n"
+            sino si siguiente == "t":
+                resultado = resultado + "\t"
+            sino si siguiente == "r":
+                resultado = resultado + "\r"
+            sino si siguiente == "\\":
+                resultado = resultado + "\\"
+            sino si siguiente == '"':
+                resultado = resultado + '"'
+            posicion = posicion + 2
+        sino:
+            resultado = resultado + texto[posicion]
+            posicion = posicion + 1
+    retornar [nulo, posicion]
+
+funcion _parsear_array(texto, posicion):
+    posicion = posicion + 1
+    resultado = []
+    mientras posicion < texto.longitud():
+        posicion = _saltar_espacios(texto, posicion)
+        si posicion >= texto.longitud():
+            retornar [resultado, posicion]
+        si texto[posicion] == "]":
+            posicion = posicion + 1
+            retornar [resultado, posicion]
+        [elemento, posicion] = _parsear_json(texto, posicion)
+        resultado.agregar(elemento)
+        posicion = _saltar_espacios(texto, posicion)
+        si posicion < texto.longitud() y texto[posicion] == ",":
+            posicion = posicion + 1
+    retornar [resultado, posicion]
+
+funcion _parsear_objeto(texto, posicion):
+    posicion = posicion + 1
+    resultado = {}
+    mientras posicion < texto.longitud():
+        posicion = _saltar_espacios(texto, posicion)
+        si posicion >= texto.longitud():
+            retornar [resultado, posicion]
+        si texto[posicion] == "}":
+            posicion = posicion + 1
+            retornar [resultado, posicion]
+        [clave, posicion] = _parsear_json(texto, posicion)
+        posicion = _saltar_espacios(texto, posicion)
+        si posicion < texto.longitud() y texto[posicion] == ":":
+            posicion = posicion + 1
+        [valor, posicion] = _parsear_json(texto, posicion)
+        resultado[clave] = valor
+        posicion = _saltar_espacios(texto, posicion)
+        si posicion < texto.longitud() y texto[posicion] == ",":
+            posicion = posicion + 1
+    retornar [resultado, posicion]
+
+funcion _parsear_json(texto, posicion):
+    posicion = _saltar_espacios(texto, posicion)
+    
+    si posicion >= texto.longitud():
+        retornar [nulo, posicion]
+    
+    caracter = texto[posicion]
+    
+    # Null
+    si caracter == "n":
+        retornar _parsear_null(texto, posicion)
+    
+    # Booleanos
+    si caracter == "t" o caracter == "f":
+        retornar _parsear_booleano(texto, posicion)
+    
+    # Números
+    si (caracter >= "0" y caracter <= "9") o caracter == "-":
+        retornar _parsear_numero(texto, posicion)
+    
+    # Cadenas
+    si caracter == '"':
+        retornar _parsear_cadena(texto, posicion)
+    
+    # Arrays
+    si caracter == "[":
+        retornar _parsear_array(texto, posicion)
+    
+    # Objetos
+    si caracter == "{":
+        retornar _parsear_objeto(texto, posicion)
+    
+    retornar [nulo, posicion]
+
+funcion cargar(archivo):
+    contenido = os.leer_archivo(archivo)
+    si contenido == nulo:
+        lanzar("No se pudo leer el archivo: " + archivo)
+    si contenido == "":
+        retornar nulo
+    [resultado, posicion] = _parsear_json(contenido, 0)
+    retornar resultado

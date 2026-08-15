@@ -1,0 +1,15 @@
+func ahora
+func dormir
+func formatear
+func parsear
+func timestamp
+func sumar
+func diferencia
+func fecha
+func dia_semana
+func dias_mes
+func es_bisiesto
+func strftime
+func strptime
+func cronometro
+func contador_perf
