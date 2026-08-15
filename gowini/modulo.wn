@@ -1,0 +1,5 @@
+importar "modulo.dll" como mod
+importar "carpeta/modulo.dll" como modulo
+
+
+mod.funcion()
