@@ -11,6 +11,9 @@ class Nodo:
     def __repr__(self):
         return f"Nodo({self.tipo}, {self.valor}, {self.hijos}, line={self.linea})"
 
+    def __slot__(self, key):
+        """Permite acceder a los atributos como un diccionario."""
+        return getattr(self, key)
 
 class Parser:
     def __init__(self, tokens):
@@ -47,6 +50,23 @@ class Parser:
         linea = token[2] if token else "desconocida"
         col = token[3] if token else ""
         raise SintaxisError(f"Se esperaba {tipo}, pero se encontró {token} (línea {linea}, columna {col})", linea=linea)
+
+    def parsear_argumento(self):
+        """Parsea un argumento de una llamada: puede ser posicional (una
+        expresión normal) o nombrado, con la forma 'identificador = expresion'
+        (p.ej. alguna(genial="si")). Se distingue mirando dos tokens hacia
+        adelante para no confundirlo con comparaciones ('==') ni con
+        expresiones que solo empiezan con un identificador."""
+        token = self.token_actual()
+        siguiente = self.tokens[self.posicion + 1] if self.posicion + 1 < len(self.tokens) else None
+        if (token and token[0] == "IDENTIFICADOR" and
+                siguiente and siguiente[0] == "OPERADOR" and siguiente[1] == "="):
+            linea = token[2]
+            nombre_arg = self.esperado("IDENTIFICADOR")
+            self.esperado("OPERADOR")  # consume '='
+            valor = self.parsear_expresion()
+            return Nodo("ARG_NOMBRADO", nombre_arg, [valor], linea=linea)
+        return self.parsear_expresion()
 
     def _encontrar_corchete_cierre(self, inicio):
         balance = 0
@@ -125,21 +145,8 @@ class Parser:
             
             # IMPORTAR
             if valor_token == "importar":
-                linea = self.token_linea()
-                self.esperado("PALABRA_CLAVE")
-                self.esperado("PARENTESIS")
-                modulo = self.parsear_expresion()
-                self.esperado("PARENTESIS")
-                return Nodo("IMPORTAR", hijos=[modulo], linea=linea)
-            
-            # PAQUETE
-            if valor_token == "paquete":
-                return self.parsear_paquete()
-            
-            # CLASE
-            if valor_token == "clase":
-                return self.parsear_clase()
-            
+                return self.parsear_importar()
+
             # FUNCION
             if valor_token == "funcion":
                 return self.parsear_funcion()
@@ -155,10 +162,10 @@ class Parser:
                 self.esperado("PARENTESIS")
                 argumentos = []
                 if self.token_actual() and not (self.token_actual()[0] == "PARENTESIS" and self.token_actual()[1] == ")"):
-                    argumentos.append(self.parsear_expresion())
+                    argumentos.append(self.parsear_argumento())
                     while self.token_actual() and self.token_actual()[0] == "COMA":
                         self.esperado("COMA")
-                        argumentos.append(self.parsear_expresion())
+                        argumentos.append(self.parsear_argumento())
                 self.esperado("PARENTESIS")
                 return Nodo("LLAMADA", nombre, argumentos, linea=linea)
             
@@ -169,10 +176,10 @@ class Parser:
                 self.esperado("PARENTESIS")
                 argumentos = []
                 if self.token_actual() and not (self.token_actual()[0] == "PARENTESIS" and self.token_actual()[1] == ")"):
-                    argumentos.append(self.parsear_expresion())
+                    argumentos.append(self.parsear_argumento())
                     while self.token_actual() and self.token_actual()[0] == "COMA":
                         self.esperado("COMA")
-                        argumentos.append(self.parsear_expresion())
+                        argumentos.append(self.parsear_argumento())
                 self.esperado("PARENTESIS")
                 return Nodo("LLAMADA", nombre, argumentos, linea=linea)
 
@@ -187,19 +194,8 @@ class Parser:
                 if idx_cierre + 1 < len(self.tokens) and self.tokens[idx_cierre + 1][1] == "=":
                     return self.parsear_asignacion()
 
-            token_siguiente_siguiente = None
-            if self.posicion + 2 < len(self.tokens):
-                token_siguiente_siguiente = self.tokens[self.posicion + 2]
-
             if token_siguiente and token_siguiente[1] == "=":
                 return self.parsear_asignacion()
-
-            if (token_siguiente and token_siguiente[0] == "PUNTO" and
-                token_siguiente_siguiente and token_siguiente_siguiente[0] == "IDENTIFICADOR"):
-                if self.posicion + 3 < len(self.tokens):
-                    token_despues_attr = self.tokens[self.posicion + 3]
-                    if token_despues_attr[1] == "=":
-                        return self.parsear_asignacion()
 
         # Si no es asignación, es una expresión suelta
         return self.parsear_expresion()
@@ -221,19 +217,6 @@ class Parser:
             expr = self.parsear_expresion()
             return Nodo("ASIGNACION_INDEX", id_nombre, [indice, expr], linea=linea_id)
 
-        # Asignación a atributo
-        if self.token_actual() and self.token_actual()[0] == "PUNTO":
-            self.esperado("PUNTO")
-            atributo = self.esperado("IDENTIFICADOR")
-            token = self.token_actual()
-            if not token or token[1] != "=":
-                raise SintaxisError(f"Se esperaba '=' pero se encontró {token}",linea=linea_id)
-            self.token_siguiente()
-            expr = self.parsear_expresion()
-            return Nodo("ASIGNACION_ATRIBUTO", id_nombre,
-                        [Nodo("IDENTIFICADOR", atributo, linea=linea_id), expr],
-                        linea=linea_id)
-
         # Asignación simple
         token = self.token_actual()
         if not token or token[1] != "=":
@@ -242,7 +225,7 @@ class Parser:
         expr = self.parsear_expresion()
         return Nodo("ASIGNACION", id_nombre, [expr], linea=linea_id)
 
-    def parsear_funcion(self, en_clase=False):
+    def parsear_funcion(self):
         linea = self.token_linea()
         self.esperado("PALABRA_CLAVE")  # funcion
         nombre_funcion = self.esperado("IDENTIFICADOR")
@@ -305,88 +288,77 @@ class Parser:
         nodo.docstring = docstring  # adjuntar docstring al nodo
         return nodo
 
-    def parsear_clase(self):
+    def parsear_si(self, palabras_parada=None):
+        """Parsea un condicional si con sintaxis: si condicion entonces: ... sino: ... fin"""
+        if palabras_parada is None:
+            palabras_parada = set()
         linea = self.token_linea()
-        self.esperado("PALABRA_CLAVE")  # clase
-        nombre_clase = self.esperado("IDENTIFICADOR")
-        clase_padre = None
-        if (self.token_actual() and
-            self.token_actual()[0] == "PARENTESIS" and
-            self.token_actual()[1] == "("):
-            self.esperado("PARENTESIS")
-            clase_padre = self.esperado("IDENTIFICADOR")
-            self.esperado("PARENTESIS")
-        self.esperado("PUNTOS")
+        self.esperado("PALABRA_CLAVE")  # si
+        condicion = self.parsear_expresion()
+        
+        # Verificar que sigue 'entonces'
+        if (self.token_actual() and 
+            self.token_actual()[0] == "PALABRA_CLAVE" and 
+            self.token_actual()[1] == "entonces"):
+            self.esperado("PALABRA_CLAVE")  # entonces
+        else:
+            raise SintaxisError("Se esperaba 'entonces' después de la condición", linea=linea)
+        
+        self.esperado("PUNTOS")  # :
+        
+        # Leer indentación
         if not self.token_actual() or self.token_actual()[0] != "NUEVA_LINEA":
-            raise SintaxisError("Se esperaba un salto de línea después de ':' en la clase", linea=linea)
+            raise SintaxisError("Se esperaba un salto de línea después de ':'", linea=linea)
+        
         indentacion_bloque = self.esperado("NUEVA_LINEA")
-        metodos = []
+        
+        # Leer bloque SI
+        bloque_si = []
         while self.token_actual():
             if self.token_actual()[0] == "NUEVA_LINEA":
                 if self.token_actual()[1] < indentacion_bloque:
                     break
                 self.token_siguiente()
                 continue
-            if (self.token_actual()[0] == "PALABRA_CLAVE" and
-                self.token_actual()[1] == "funcion"):
-                metodos.append(self.parsear_funcion(en_clase=True))
-            else:
-                break
-        self.saltar_nuevas_lineas()
-        if self.token_actual() and self.token_actual()[0] == "PALABRA_CLAVE" and self.token_actual()[1] == "fin":
-            self.esperado("PALABRA_CLAVE")
-        padre_node = Nodo("PADRE", clase_padre, linea=linea) if clase_padre else Nodo("PADRE", None, linea=linea)
-        return Nodo("CLASE", nombre_clase, [padre_node, Nodo("METODOS", hijos=metodos)], linea=linea)
-
-    def parsear_paquete(self):
-        linea = self.token_linea()
-        self.esperado("PALABRA_CLAVE")
-        self.esperado("PARENTESIS")
-        nombre = self.parsear_expresion()
-        carpeta = None
-        if self.token_actual() and self.token_actual()[0] == "COMA":
-            self.esperado("COMA")
-            carpeta = self.parsear_expresion()
-        self.esperado("PARENTESIS")
-        hijos = [nombre] + ([carpeta] if carpeta is not None else [])
-        return Nodo("PAQUETE", hijos=hijos, linea=linea)
-
-    def parsear_si(self, palabras_parada=None):
-        if palabras_parada is None:
-            palabras_parada = set()
-        linea = self.token_linea()
-        self.esperado("PALABRA_CLAVE")  # si
-        self.esperado("PARENTESIS")
-        condicion = self.parsear_expresion()
-        self.esperado("PARENTESIS")
-        self.esperado("PALABRA_CLAVE")  # entonces
-        self.esperado("PUNTOS")
-        bloque_si = []
-        while self.token_actual():
-            self.saltar_nuevas_lineas()
+            
             if (self.token_actual() and self.token_actual()[0] == "PALABRA_CLAVE" and
                 self.token_actual()[1] in ("sino", "fin")):
                 break
-            if not self.token_actual():
-                break
+            
             bloque_si.append(self.parsear_sentencia())
+        
+        # Leer bloque SINO (opcional)
         bloque_sino = []
+        self.saltar_nuevas_lineas()
         if (self.token_actual() and
             self.token_actual()[0] == "PALABRA_CLAVE" and
             self.token_actual()[1] == "sino"):
             self.esperado("PALABRA_CLAVE")  # sino
-            self.esperado("PUNTOS")
+            self.esperado("PUNTOS")  # :
+            
+            if not self.token_actual() or self.token_actual()[0] != "NUEVA_LINEA":
+                raise SintaxisError("Se esperaba un salto de línea después de ':'", linea=linea)
+            
+            indentacion_sino = self.esperado("NUEVA_LINEA")
+            
             while self.token_actual():
-                self.saltar_nuevas_lineas()
+                if self.token_actual()[0] == "NUEVA_LINEA":
+                    if self.token_actual()[1] < indentacion_sino:
+                        break
+                    self.token_siguiente()
+                    continue
+                
                 if (self.token_actual() and self.token_actual()[0] == "PALABRA_CLAVE" and
                     self.token_actual()[1] == "fin"):
                     break
-                if not self.token_actual():
-                    break
+                
                 bloque_sino.append(self.parsear_sentencia())
+        
+        # Consumir 'fin'
         self.saltar_nuevas_lineas()
-        if self.token_actual() and self.token_actual()[1] == "fin":
+        if self.token_actual() and self.token_actual()[0] == "PALABRA_CLAVE" and self.token_actual()[1] == "fin":
             self.esperado("PALABRA_CLAVE")
+        
         return Nodo("SI", hijos=[
             condicion,
             Nodo("BLOQUE_SI", hijos=bloque_si),
@@ -470,7 +442,7 @@ class Parser:
                     self.esperado("PARENTESIS")
                 
                 # Forma sin paréntesis: capturar Tipo como var:
-                # También soporta: capturar modulo.Clase como var:
+                # También soporta notación con punto: capturar modulo.NombreError como var:
                 elif (self.token_actual() and
                       self.token_actual()[0] == "IDENTIFICADOR"):
                     tipo_error = self.esperado("IDENTIFICADOR")
@@ -590,14 +562,40 @@ class Parser:
                     ],
                     linea=capturar_info["linea"])
 
+    def parsear_importar(self):
+        """Parsea la instrucción 'importar'
+
+        Sintaxis soportada:
+            importar modulo
+            importar modulo como alias
+            importar carpeta.modulo como alias   # subcarpetas con notación de punto
+        """
+        linea = self.token_linea()
+        self.esperado("PALABRA_CLAVE")  # importar
+
+        nombre_modulo = self.esperado("IDENTIFICADOR")
+        while self.token_actual() and self.token_actual()[0] == "PUNTO":
+            self.esperado("PUNTO")
+            nombre_modulo += "." + self.esperado("IDENTIFICADOR")
+
+        alias = None
+        if (self.token_actual() and
+                self.token_actual()[0] == "PALABRA_CLAVE" and
+                self.token_actual()[1] == "como"):
+            self.esperado("PALABRA_CLAVE")  # como
+            alias = self.esperado("IDENTIFICADOR")
+
+        nodo_alias = Nodo("ALIAS", alias, linea=linea)
+        return Nodo("IMPORTAR", nombre_modulo, hijos=[nodo_alias], linea=linea)
+
     def parsear_lanzar(self):
         """Parsea la instrucción 'lanzar'
 
         Sintaxis soportada:
             lanzar(ErrorTipo, "mensaje")          # forma antigua con paréntesis
-            lanzar(modulo.Clase, "mensaje")       # forma antigua con módulo
+            lanzar(modulo.NombreError, "mensaje") # forma antigua con módulo
             lanzar ErrorTipo("mensaje")           # forma nueva sin paréntesis externos
-            lanzar modulo.Clase("mensaje")        # forma nueva con módulo
+            lanzar modulo.NombreError("mensaje")  # forma nueva con módulo
         """
         linea = self.token_linea()
         self.esperado("PALABRA_CLAVE")  # lanzar
@@ -611,7 +609,7 @@ class Parser:
         if token and token[0] == "IDENTIFICADOR":
             tipo_error = self.esperado("IDENTIFICADOR")
 
-            # ¿notación de módulo?  lanzar modulo.Clase(...)
+            # ¿notación de módulo?  lanzar modulo.NombreError(...)
             if self.token_actual() and self.token_actual()[0] == "PUNTO":
                 self.esperado("PUNTO")
                 tipo_error = tipo_error + "." + self.esperado("IDENTIFICADOR")
@@ -654,78 +652,109 @@ class Parser:
         raise SintaxisError(f"Sintaxis inválida para 'lanzar'", linea=linea)
 
     def parsear_mientras(self):
+        """Parsea un bucle mientras con sintaxis: mientras condicion entonces: ... fin"""
         linea = self.token_linea()
-        self.esperado("PALABRA_CLAVE")
-        self.esperado("PARENTESIS")
+        self.esperado("PALABRA_CLAVE")  # mientras
+        
+        # ✅ Ya no esperamos PARENTESIS
         condicion = self.parsear_expresion()
-        self.esperado("PARENTESIS")
-        self.esperado("PALABRA_CLAVE")  # entonces
-        self.esperado("PUNTOS")
+        
+        # Verificar 'entonces'
+        if (self.token_actual() and 
+            self.token_actual()[0] == "PALABRA_CLAVE" and 
+            self.token_actual()[1] == "entonces"):
+            self.esperado("PALABRA_CLAVE")  # entonces
+        else:
+            raise SintaxisError("Se esperaba 'entonces' después de la condición", linea=linea)
+        
+        self.esperado("PUNTOS")  # :
+        
+        if not self.token_actual() or self.token_actual()[0] != "NUEVA_LINEA":
+            raise SintaxisError("Se esperaba un salto de línea después de ':'", linea=linea)
+        
+        indentacion_bloque = self.esperado("NUEVA_LINEA")
+        
         bloque = []
         while self.token_actual():
-            self.saltar_nuevas_lineas()
+            if self.token_actual()[0] == "NUEVA_LINEA":
+                if self.token_actual()[1] < indentacion_bloque:
+                    break
+                self.token_siguiente()
+                continue
+            
             if (self.token_actual() and self.token_actual()[0] == "PALABRA_CLAVE" and
                 self.token_actual()[1] == "fin"):
                 break
-            if not self.token_actual():
-                break
+            
             bloque.append(self.parsear_sentencia())
+        
         self.saltar_nuevas_lineas()
-        if self.token_actual() and self.token_actual()[1] == "fin":
+        if self.token_actual() and self.token_actual()[0] == "PALABRA_CLAVE" and self.token_actual()[1] == "fin":
             self.esperado("PALABRA_CLAVE")
+        
         return Nodo("MIENTRAS", hijos=[condicion, Nodo("BLOQUE", hijos=bloque)], linea=linea)
 
+# En parser.py, reemplaza el método parsear_para() por este:
+
     def parsear_para(self):
+        """Parsea un bucle para con sintaxis mejorada:
+        para variable en expresion:
+            # cuerpo
+        fin
+        """
         linea = self.token_linea()
         
-        # 1. Validar que el token actual sea la palabra clave 'para'
-        token_para = self.token_actual()
-        if token_para and token_para[0] == "PALABRA_CLAVE" and token_para[1] == "para":
-            self.token_siguiente() # Consumimos 'para' manualmente ya que no tiene tipo propio
-        else:
-            raise SintaxisError(f"Se esperaba 'para', pero se encontró {token_para}",linea=linea)
-            
-        # 2. Consumir la variable (ej. 'i') usando tu método esperado que devuelve el valor
-        # Ojo: esperado() en tu parser ya devuelve solo el valor del identificador o lanza SintaxisError
-        variable_str = self.esperado("IDENTIFICADOR") 
-        # Creamos el nodo para la variable
+        # 1. Consumir 'para'
+        self.esperado("PALABRA_CLAVE")  # para
+        
+        # 2. Variable
+        variable_str = self.esperado("IDENTIFICADOR")
         variable_nodo = Nodo("IDENTIFICADOR", valor=variable_str, linea=linea)
         
-        # 3. Validar la palabra clave 'en' (que está dentro de OPERADOR_LOGICO en tus tokens)
+        # 3. Consumir 'en'
         token_en = self.token_actual()
         if token_en and token_en[0] == "OPERADOR_LOGICO" and token_en[1] == "en":
-            self.token_siguiente() # Consumimos 'en'
+            self.token_siguiente()
         else:
-            raise SintaxisError(f"Se esperaba 'en', pero se encontró {token_en}",linea=linea)
-            
-        # 4. Recolectar la expresión iterable (ej: rango(1, 6) o mi_lista)
-        expresion_iterable = self.parsear_expresion() 
+            raise SintaxisError(f"Se esperaba 'en', pero se encontró {token_en}", linea=linea)
         
-        # 5. Consumir los dos puntos ':' (que en tu parser se llama "PUNTOS")
+        # 4. Expresión iterable
+        expresion_iterable = self.parsear_expresion()
+        
+        # 5. Consumir ':'
         self.esperado("PUNTOS")
-        self.saltar_nuevas_lineas()
         
-        # 6. Recolectar el cuerpo/bloque de código del bucle
-        # Al ver tu parser.py, descubrí que usas un bucle manual en parse() para recolectar sentencias,
-        # así que hacemos exactamente lo mismo aquí para leer hasta encontrar el 'fin'
+        # 6. Verificar nueva línea
+        if not self.token_actual() or self.token_actual()[0] != "NUEVA_LINEA":
+            raise SintaxisError("Se esperaba un salto de línea después de ':'", linea=linea)
+        
+        indentacion_bloque = self.esperado("NUEVA_LINEA")
+        
+        # 7. Recolectar el cuerpo
         sentencias_bloque = []
-        while self.token_actual() and not (self.token_actual()[0] == "PALABRA_CLAVE" and self.token_actual()[1] == "fin"):
+        while self.token_actual():
+            if self.token_actual()[0] == "NUEVA_LINEA":
+                if self.token_actual()[1] < indentacion_bloque:
+                    break
+                self.token_siguiente()
+                continue
+            
+            if (self.token_actual()[0] == "PALABRA_CLAVE" and 
+                self.token_actual()[1] == "fin"):
+                break
+            
             sentencia = self.parsear_sentencia()
             if sentencia:
                 sentencias_bloque.append(sentencia)
-            self.saltar_nuevas_lineas()
-            
-        # Creamos el nodo que agrupa el bloque de instrucciones
-        bloque_nodo = Nodo("BLOQUE", hijos=sentencias_bloque, linea=linea)
         
-        # 7. Consumir la palabra clave 'fin' que cierra el bucle
-        token_fin = self.token_actual()
-        if token_fin and token_fin[0] == "PALABRA_CLAVE" and token_fin[1] == "fin":
-            self.token_siguiente() # Consumimos 'fin'
+        # 8. Consumir 'fin'
+        self.saltar_nuevas_lineas()
+        if self.token_actual() and self.token_actual()[0] == "PALABRA_CLAVE" and self.token_actual()[1] == "fin":
+            self.token_siguiente()
         else:
-            raise SintaxisError(f"Se esperaba 'fin' para cerrar el bucle para, pero se encontró {token_fin}", linea=linea)
-            
-        # Retornamos el Nodo definitivo con los 3 hijos limpios para tu intérprete
+            raise SintaxisError("Se esperaba 'fin' para cerrar el bucle para", linea=linea)
+        
+        bloque_nodo = Nodo("BLOQUE", hijos=sentencias_bloque, linea=linea)
         return Nodo("PARA", hijos=[variable_nodo, expresion_iterable, bloque_nodo], linea=linea)
     # ---------- Expresiones ----------
     def parsear_expresion(self):
@@ -803,6 +832,65 @@ class Parser:
 
     def parsear_factor(self):
         token = self.token_actual()
+        if token and token[0] == "OPERADOR" and token[1] in ("-", "+"):
+            linea = self.token_linea()
+            op = self.esperado("OPERADOR")
+            operando = self.parsear_factor()
+            if op == "+":
+                # El '+' unario no hace nada, se descarta.
+                return operando
+            return Nodo("UNARIA", op, [operando], linea=linea)
+
+        nodo = self._parsear_atomo()
+        return self._parsear_postfijos(nodo)
+
+    def _parsear_postfijos(self, nodo):
+        """Encadena .atributo, .metodo(args) y [indice] sobre CUALQUIER expresión
+        (variables, llamadas a función, literales, otros encadenamientos, etc.),
+        para permitir cosas como leer("...").a_entero() o a.dividir(",").primero()."""
+        while True:
+            token = self.token_actual()
+            if not token:
+                break
+
+            if token[0] == "PUNTO":
+                linea = nodo.linea
+                self.esperado("PUNTO")
+                token_atributo = self.token_actual()
+                if token_atributo and token_atributo[0] == "IDENTIFICADOR":
+                    atributo = self.esperado("IDENTIFICADOR")
+                elif token_atributo and token_atributo[0] == "PALABRA_CLAVE":
+                    atributo = self.esperado("PALABRA_CLAVE")
+                else:
+                    raise SintaxisError(f"Se esperaba identificador después de '.', pero encontró {token_atributo}", linea=linea)
+
+                if self.token_actual() and self.token_actual()[0] == "PARENTESIS" and self.token_actual()[1] == "(":
+                    self.esperado("PARENTESIS")
+                    argumentos = []
+                    if self.token_actual() and not (self.token_actual()[0] == "PARENTESIS" and self.token_actual()[1] == ")"):
+                        argumentos.append(self.parsear_argumento())
+                        while self.token_actual() and self.token_actual()[0] == "COMA":
+                            self.esperado("COMA")
+                            argumentos.append(self.parsear_argumento())
+                    self.esperado("PARENTESIS")
+                    nodo = Nodo("LLAMADA_METODO", atributo, [nodo] + argumentos, linea=linea)
+                else:
+                    nodo = Nodo("ACCESO_ATRIBUTO", atributo, [nodo], linea=linea)
+
+            elif token[0] == "CORCHETE" and token[1] == "[":
+                linea = nodo.linea
+                self.esperado("CORCHETE")
+                indice = self.parsear_expresion()
+                self.esperado("CORCHETE")
+                nodo = Nodo("INDEXACION", None, [nodo, indice], linea=linea)
+
+            else:
+                break
+
+        return nodo
+
+    def _parsear_atomo(self):
+        token = self.token_actual()
         linea = token[2] if token else None
 
         if token[0] == "ENTERO":
@@ -830,10 +918,10 @@ class Parser:
             self.esperado("PARENTESIS")
             argumentos = []
             if self.token_actual() and not (self.token_actual()[0] == "PARENTESIS" and self.token_actual()[1] == ")"):
-                argumentos.append(self.parsear_expresion())
+                argumentos.append(self.parsear_argumento())
                 while self.token_actual() and self.token_actual()[0] == "COMA":
                     self.esperado("COMA")
-                    argumentos.append(self.parsear_expresion())
+                    argumentos.append(self.parsear_argumento())
             self.esperado("PARENTESIS")
             return Nodo("LLAMADA", nombre, argumentos, linea=linea)
         elif token[0] == "PALABRA_CLAVE" and token[1] == "leer":
@@ -841,10 +929,10 @@ class Parser:
             self.esperado("PARENTESIS")
             argumentos = []
             if self.token_actual() and not (self.token_actual()[0] == "PARENTESIS" and self.token_actual()[1] == ")"):
-                argumentos.append(self.parsear_expresion())
+                argumentos.append(self.parsear_argumento())
                 while self.token_actual() and self.token_actual()[0] == "COMA":
                     self.esperado("COMA")
-                    argumentos.append(self.parsear_expresion())
+                    argumentos.append(self.parsear_argumento())
             self.esperado("PARENTESIS")
             return Nodo("LLAMADA", nombre, argumentos, linea=linea)
         elif token[0] == "PALABRA_CLAVE" and token[1] == "tipo":
@@ -852,51 +940,23 @@ class Parser:
             self.esperado("PARENTESIS")
             argumentos = []
             if self.token_actual() and not (self.token_actual()[0] == "PARENTESIS" and self.token_actual()[1] == ")"):
-                argumentos.append(self.parsear_expresion())
+                argumentos.append(self.parsear_argumento())
                 while self.token_actual() and self.token_actual()[0] == "COMA":
                     self.esperado("COMA")
-                    argumentos.append(self.parsear_expresion())
+                    argumentos.append(self.parsear_argumento())
             self.esperado("PARENTESIS")
             return Nodo("LLAMADA", nombre, argumentos, linea=linea)
         elif token[0] == "IDENTIFICADOR":
             valor = self.esperado("IDENTIFICADOR")
-            # Acceso a atributo o método
-            if self.token_actual() and self.token_actual()[0] == "PUNTO":
-                self.esperado("PUNTO")
-                token_atributo = self.token_actual()
-                if token_atributo[0] == "IDENTIFICADOR":
-                    atributo = self.esperado("IDENTIFICADOR")
-                elif token_atributo[0] == "PALABRA_CLAVE":
-                    atributo = self.esperado("PALABRA_CLAVE")
-                else:
-                    raise SintaxisError(f"Se esperaba identificador después de '.', pero encontró {token_atributo}",linea=linea)
-                if self.token_actual() and self.token_actual()[0] == "PARENTESIS" and self.token_actual()[1] == "(":
-                    self.esperado("PARENTESIS")
-                    argumentos = []
-                    if self.token_actual() and not (self.token_actual()[0] == "PARENTESIS" and self.token_actual()[1] == ")"):
-                        argumentos.append(self.parsear_expresion())
-                        while self.token_actual() and self.token_actual()[0] == "COMA":
-                            self.esperado("COMA")
-                            argumentos.append(self.parsear_expresion())
-                    self.esperado("PARENTESIS")
-                    return Nodo("LLAMADA_METODO", valor, [Nodo("IDENTIFICADOR", atributo, linea=linea)] + argumentos, linea=linea)
-                else:
-                    return Nodo("ACCESO_ATRIBUTO", valor, [Nodo("IDENTIFICADOR", atributo, linea=linea)], linea=linea)
-            # Indexación
-            elif self.token_actual() and self.token_actual()[0] == "CORCHETE" and self.token_actual()[1] == "[":
-                self.esperado("CORCHETE")
-                indice = self.parsear_expresion()
-                self.esperado("CORCHETE")
-                return Nodo("INDEXACION", valor, [indice], linea=linea)
             # Llamada a función
-            elif self.token_actual() and self.token_actual()[0] == "PARENTESIS" and self.token_actual()[1] == "(":
+            if self.token_actual() and self.token_actual()[0] == "PARENTESIS" and self.token_actual()[1] == "(":
                 self.esperado("PARENTESIS")
                 argumentos = []
                 if self.token_actual() and not (self.token_actual()[0] == "PARENTESIS" and self.token_actual()[1] == ")"):
-                    argumentos.append(self.parsear_expresion())
+                    argumentos.append(self.parsear_argumento())
                     while self.token_actual() and self.token_actual()[0] == "COMA":
                         self.esperado("COMA")
-                        argumentos.append(self.parsear_expresion())
+                        argumentos.append(self.parsear_argumento())
                 self.esperado("PARENTESIS")
                 return Nodo("LLAMADA", valor, argumentos, linea=linea)
             else:
