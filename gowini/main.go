@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime/debug"
-	"wini-go/wini"
+	"wini/wini"
 )
 
 const Version = "2.3.0"
@@ -60,6 +60,7 @@ Ejemplos:
 ╠════════════════════════════════════════════════════════════════════╣
 ║  wini programa.wn              # Ejecutar con intérprete           ║
 ║  wini --version                # Mostrar versión                   ║
+║  wpack --version               # Gestor de paquetes                ║
 ╚════════════════════════════════════════════════════════════════════╝
 `, Version)
 	}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 )
 
@@ -200,6 +201,47 @@ func (e *Ejecutor) EjecutarMetodoNativo(objeto interface{}, metodoNombre string,
 				}
 				return resultado
 			}
+		}
+	}
+
+	// Métodos para booleanos
+	if booleano, ok := objeto.(bool); ok {
+		if metodo, ok := MetodosBooleano[metodoNombre]; ok {
+			resultado, err := metodo(booleano, argumentos, nombrados)
+			if err != nil {
+				linea := 0
+				if nodo != nil {
+					linea = nodo.Linea
+				}
+				panic(&RuntimeError{
+					ErrorConLinea: ErrorConLinea{
+						Mensaje: fmt.Sprintf("Error al ejecutar método nativo '%s' en booleano: %v", metodoNombre, err),
+						Linea:   &linea,
+					},
+				})
+			}
+			return resultado
+		}
+	}
+
+	// Métodos para números (int y float64)
+	switch objeto.(type) {
+	case int, float64:
+		if metodo, ok := MetodosNumero[metodoNombre]; ok {
+			resultado, err := metodo(objeto, argumentos, nombrados)
+			if err != nil {
+				linea := 0
+				if nodo != nil {
+					linea = nodo.Linea
+				}
+				panic(&RuntimeError{
+					ErrorConLinea: ErrorConLinea{
+						Mensaje: fmt.Sprintf("Error al ejecutar método nativo '%s' en número: %v", metodoNombre, err),
+						Linea:   &linea,
+					},
+				})
+			}
+			return resultado
 		}
 	}
 
@@ -430,6 +472,176 @@ func (e *Ejecutor) EjecutarFuncionWini(funcionDef map[string]interface{}, posici
 	return resultado
 }
 
+// NombreTipoWini devuelve el nombre del tipo Wini de un valor Go, tal como
+// lo usan las funciones 'tipo' y los mensajes de error de conversión.
+func (e *Ejecutor) NombreTipoWini(valor interface{}) string {
+	switch v := valor.(type) {
+	case string:
+		return "cadena"
+	case []interface{}:
+		return "lista"
+	case bool:
+		return "booleano"
+	case int:
+		return "entero"
+	case float64:
+		return "decimal"
+	case map[string]interface{}:
+		return "diccionario"
+	default:
+		if v == nil {
+			return "ninguno"
+		}
+		return reflect.TypeOf(v).Name()
+	}
+}
+
+// ConvertirAEntero implementa la función global entero(x), al estilo de
+// Python: panic con ErrorTipo/ErrorValor si la conversión no es posible.
+func (e *Ejecutor) ConvertirAEntero(valor interface{}, nodo *Nodo) interface{} {
+	switch v := valor.(type) {
+	case int:
+		return v
+	case float64:
+		return int(v)
+	case bool:
+		if v {
+			return 1
+		}
+		return 0
+	case string:
+		texto := strings.TrimSpace(v)
+		if n, err := strconv.Atoi(texto); err == nil {
+			return n
+		}
+		if f, err := strconv.ParseFloat(texto, 64); err == nil {
+			return int(f)
+		}
+		panic(&ErrorValor{ErrorConLinea: ErrorConLinea{
+			Mensaje: fmt.Sprintf("no se puede convertir '%s' a entero", v),
+			Linea:   &nodo.Linea,
+		}})
+	default:
+		panic(&ErrorTipo{ErrorConLinea: ErrorConLinea{
+			Mensaje: fmt.Sprintf("no se puede convertir un valor de tipo '%s' a entero", e.NombreTipoWini(valor)),
+			Linea:   &nodo.Linea,
+		}})
+	}
+}
+
+// ConvertirADecimal implementa la función global decimal(x).
+func (e *Ejecutor) ConvertirADecimal(valor interface{}, nodo *Nodo) interface{} {
+	switch v := valor.(type) {
+	case float64:
+		return v
+	case int:
+		return float64(v)
+	case bool:
+		if v {
+			return 1.0
+		}
+		return 0.0
+	case string:
+		texto := strings.TrimSpace(v)
+		if f, err := strconv.ParseFloat(texto, 64); err == nil {
+			return f
+		}
+		panic(&ErrorValor{ErrorConLinea: ErrorConLinea{
+			Mensaje: fmt.Sprintf("no se puede convertir '%s' a decimal", v),
+			Linea:   &nodo.Linea,
+		}})
+	default:
+		panic(&ErrorTipo{ErrorConLinea: ErrorConLinea{
+			Mensaje: fmt.Sprintf("no se puede convertir un valor de tipo '%s' a decimal", e.NombreTipoWini(valor)),
+			Linea:   &nodo.Linea,
+		}})
+	}
+}
+
+// ConvertirALista implementa la función global lista(x). Cadenas se separan
+// en caracteres y diccionarios se convierten en la lista de sus claves,
+// igual que list() en Python.
+func (e *Ejecutor) ConvertirALista(valor interface{}, nodo *Nodo) interface{} {
+	switch v := valor.(type) {
+	case []interface{}:
+		resultado := make([]interface{}, len(v))
+		copy(resultado, v)
+		return resultado
+	case string:
+		resultado := make([]interface{}, 0, len(v))
+		for _, r := range v {
+			resultado = append(resultado, string(r))
+		}
+		return resultado
+	case map[string]interface{}:
+		resultado := make([]interface{}, 0, len(v))
+		for k := range v {
+			resultado = append(resultado, k)
+		}
+		return resultado
+	default:
+		panic(&ErrorTipo{ErrorConLinea: ErrorConLinea{
+			Mensaje: fmt.Sprintf("no se puede convertir un valor de tipo '%s' a lista", e.NombreTipoWini(valor)),
+			Linea:   &nodo.Linea,
+		}})
+	}
+}
+
+// ConvertirADiccionario implementa la función global diccionario(x). Acepta
+// diccionarios (se copian) y listas de pares [clave, valor].
+func (e *Ejecutor) ConvertirADiccionario(valor interface{}, nodo *Nodo) interface{} {
+	switch v := valor.(type) {
+	case map[string]interface{}:
+		resultado := make(map[string]interface{}, len(v))
+		for k, val := range v {
+			resultado[k] = val
+		}
+		return resultado
+	case []interface{}:
+		resultado := make(map[string]interface{}, len(v))
+		for _, elem := range v {
+			par, ok := elem.([]interface{})
+			if !ok || len(par) != 2 {
+				panic(&ErrorValor{ErrorConLinea: ErrorConLinea{
+					Mensaje: "diccionario() requiere una lista de pares [clave, valor]",
+					Linea:   &nodo.Linea,
+				}})
+			}
+			clave := fmt.Sprintf("%v", par[0])
+			resultado[clave] = par[1]
+		}
+		return resultado
+	default:
+		panic(&ErrorTipo{ErrorConLinea: ErrorConLinea{
+			Mensaje: fmt.Sprintf("no se puede convertir un valor de tipo '%s' a diccionario", e.NombreTipoWini(valor)),
+			Linea:   &nodo.Linea,
+		}})
+	}
+}
+
+// ConvertirABooleano implementa la función global booleano(x). Al igual que
+// bool() en Python, nunca falla: evalúa la "verdad" del valor.
+func (e *Ejecutor) ConvertirABooleano(valor interface{}) interface{} {
+	switch v := valor.(type) {
+	case nil:
+		return false
+	case bool:
+		return v
+	case int:
+		return v != 0
+	case float64:
+		return v != 0
+	case string:
+		return len(v) > 0
+	case []interface{}:
+		return len(v) > 0
+	case map[string]interface{}:
+		return len(v) > 0
+	default:
+		return true
+	}
+}
+
 // EjecutarFuncionNativa ejecuta funciones nativas del intérprete
 func (e *Ejecutor) EjecutarFuncionNativa(nombre string, argumentos []interface{}, nodo *Nodo) interface{} {
 	switch nombre {
@@ -468,37 +680,73 @@ func (e *Ejecutor) EjecutarFuncionNativa(nombre string, argumentos []interface{}
 				},
 			})
 		}
-		valor := argumentos[0]
-		switch valor.(type) {
-		case string:
-			return "cadena"
-		case []interface{}:
-			return "lista"
-		case bool:
-			return "booleano"
-		case int:
-			return "entero"
-		case float64:
-			return "decimal"
-		case map[string]interface{}:
-			return "diccionario"
-		default:
-			if valor == nil {
-				return "ninguno"
-			}
-			return reflect.TypeOf(valor).Name()
-		}
+		return e.NombreTipoWini(argumentos[0])
 
-	case "texto":
+	case "cadena":
 		if len(argumentos) != 1 {
 			panic(&RuntimeError{
 				ErrorConLinea: ErrorConLinea{
-					Mensaje: fmt.Sprintf("La función 'texto' espera 1 argumento, pero recibió %d", len(argumentos)),
+					Mensaje: fmt.Sprintf("La función 'cadena' espera 1 argumento, pero recibió %d", len(argumentos)),
 					Linea:   &nodo.Linea,
 				},
 			})
 		}
 		return FormatearTexto(argumentos[0])
+
+	case "entero":
+		if len(argumentos) != 1 {
+			panic(&RuntimeError{
+				ErrorConLinea: ErrorConLinea{
+					Mensaje: fmt.Sprintf("La función 'entero' espera 1 argumento, pero recibió %d", len(argumentos)),
+					Linea:   &nodo.Linea,
+				},
+			})
+		}
+		return e.ConvertirAEntero(argumentos[0], nodo)
+
+	case "decimal":
+		if len(argumentos) != 1 {
+			panic(&RuntimeError{
+				ErrorConLinea: ErrorConLinea{
+					Mensaje: fmt.Sprintf("La función 'decimal' espera 1 argumento, pero recibió %d", len(argumentos)),
+					Linea:   &nodo.Linea,
+				},
+			})
+		}
+		return e.ConvertirADecimal(argumentos[0], nodo)
+
+	case "lista":
+		if len(argumentos) != 1 {
+			panic(&RuntimeError{
+				ErrorConLinea: ErrorConLinea{
+					Mensaje: fmt.Sprintf("La función 'lista' espera 1 argumento, pero recibió %d", len(argumentos)),
+					Linea:   &nodo.Linea,
+				},
+			})
+		}
+		return e.ConvertirALista(argumentos[0], nodo)
+
+	case "diccionario":
+		if len(argumentos) != 1 {
+			panic(&RuntimeError{
+				ErrorConLinea: ErrorConLinea{
+					Mensaje: fmt.Sprintf("La función 'diccionario' espera 1 argumento, pero recibió %d", len(argumentos)),
+					Linea:   &nodo.Linea,
+				},
+			})
+		}
+		return e.ConvertirADiccionario(argumentos[0], nodo)
+
+	case "booleano":
+		if len(argumentos) != 1 {
+			panic(&RuntimeError{
+				ErrorConLinea: ErrorConLinea{
+					Mensaje: fmt.Sprintf("La función 'booleano' espera 1 argumento, pero recibió %d", len(argumentos)),
+					Linea:   &nodo.Linea,
+				},
+			})
+		}
+		return e.ConvertirABooleano(argumentos[0])
 
 	case "longitud":
 		if len(argumentos) != 1 {

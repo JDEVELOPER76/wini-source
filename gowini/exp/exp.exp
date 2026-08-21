@@ -1,0 +1,19 @@
+# Comentarios comienzan con #
+
+# Variables
+var NOMBRE:tipo
+
+# Funciones
+func NOMBRE(param1:tipo, param2:tipo) -> tipo_retorno
+func NOMBRE(param1:tipo) -> tipo1|tipo2  # Múltiples tipos posibles
+
+# Tipos disponibles:
+# - entero
+# - decimal
+# - cadena
+# - booleano
+# - lista
+# - diccionario
+# - ninguno
+# - cualquiera (cualquier tipo)
+# - tipo1|tipo2 (unión de tipos)

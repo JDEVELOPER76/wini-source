@@ -50,6 +50,7 @@ type Token struct {
 var palabrasClave = map[string]bool{
 	"escribir":   true,
 	"sino":       true,
+	"demas":      true,
 	"si":         true,
 	"leer":       true,
 	"funcion":    true,
@@ -80,7 +81,7 @@ func compilarTokens() []DefinicionToken {
 		{BOOLEANO, regexp.MustCompile(`\b(verdadero|falso)\b`)},
 		{DECIMAL, regexp.MustCompile(`\d+\.\d+`)},
 		{ENTERO, regexp.MustCompile(`\d+`)},
-		{PALABRA_CLAVE, regexp.MustCompile(`\b(escribir|sino|si|leer|funcion|retornar|tipo|importar|paquete|mientras|para|romper|continuar|hasta|paso|intentar|capturar|finalmente|lanzar|como)\b`)},
+		{PALABRA_CLAVE, regexp.MustCompile(`\b(escribir|sino|demas|si|leer|funcion|retornar|tipo|importar|mientras|para|romper|continuar|intentar|capturar|finalmente|lanzar|como)\b`)},
 		{OPERADOR_LOGICO, regexp.MustCompile(`\b(y|o|no|en)\b`)},
 		{TIPO_DATO, regexp.MustCompile(`\b(entero|decimal|cadena|booleano|lista)\b`)},
 		{COMPARADOR, regexp.MustCompile(`==|!=|<>|<=|>=|<|>`)},

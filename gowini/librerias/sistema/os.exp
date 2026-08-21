@@ -1,34 +1,77 @@
-func cmd
-func ejecutar
-func obtener_variable
-func establecer_variable
-func listar_archivos
-func archivo_existe
-func leer_archivo
-func escribir_archivo
-func anadir_archivo
-func eliminar_archivo
-func copiar_archivo
-func mover_archivo
-func info_archivo
-func crear_directorio
-func eliminar_directorio
-func obtener_directorio
-func establecer_directorio
-func obtener_unidades
-func info_unidad
-func obtener_pid
-func obtener_procesos
-func matar_proceso
-func info_memoria
-func info_cpu
-func dormir
-func obtener_tiempo
-func formatear_tiempo
-func obtener_usuario
-func obtener_computadora
-func es_admin
-func abrir_url
-func beep
-func obtener_portapapeles
-func establecer_portapapeles
+# os.exp - Módulo de sistema para Wini
+# Versión: 2.1
+# Descripción: Funciones del sistema operativo
+
+# ===== VARIABLES =====
+var OS_VERSION:cadena
+var TEMP:cadena
+var USERNAME:cadena
+var COMPUTERNAME:cadena
+
+# ===== FUNCIONES =====
+
+# --- Comandos del sistema ---
+func cmd(comando:cadena) -> diccionario
+func ejecutar(comando:cadena) -> entero
+
+# --- Variables de entorno ---
+func obtener_variable(nombre:cadena) -> cadena|ninguno
+func establecer_variable(nombre:cadena, valor:cadena) -> booleano
+
+# --- Archivos ---
+func listar_archivos(ruta:cadena) -> lista
+func archivo_existe(ruta:cadena) -> booleano
+func leer_archivo(ruta:cadena) -> cadena|ninguno
+func escribir_archivo(ruta:cadena, contenido:cualquiera) -> booleano
+func agregar_alarchivo(ruta:cadena, contenido:cualquiera) -> booleano
+func eliminar_archivo(ruta:cadena) -> booleano
+func copiar_archivo(origen:cadena, destino:cadena) -> booleano
+func mover_archivo(origen:cadena, destino:cadena) -> booleano
+func info_archivo(ruta:cadena) -> diccionario|ninguno
+
+# --- Directorios ---
+func crear_directorio(ruta:cadena) -> booleano
+func eliminar_directorio(ruta:cadena) -> booleano
+func obtener_directorio() -> cadena
+func establecer_directorio(ruta:cadena) -> booleano
+
+# --- Unidades de disco ---
+func obtener_unidades() -> lista
+func info_unidad(letra:cadena) -> diccionario|ninguno
+
+# --- Procesos ---
+func obtener_pid() -> entero
+func obtener_procesos() -> lista
+func matar_proceso(pid:entero) -> booleano
+
+# --- Sistema ---
+func info_memoria() -> diccionario
+func info_cpu() -> diccionario
+func dormir(milisegundos:entero) -> ninguno
+
+# --- Tiempo ---
+func obtener_tiempo() -> diccionario
+func formatear_tiempo(timestamp:entero, formato:cadena) -> cadena
+
+# --- Usuario ---
+func obtener_usuario() -> cadena
+func obtener_computadora() -> cadena
+func es_admin() -> booleano
+
+# --- Misceláneo ---
+func abrir_url(url:cadena) -> booleano
+func beep(frecuencia:entero, duracion:entero) -> ninguno
+func obtener_portapapeles() -> cadena|ninguno
+func establecer_portapapeles(texto:cadena) -> booleano
+
+# ===== NUEVAS FUNCIONES PARA RUTA DEL EJECUTABLE =====
+
+# --- Obtener ruta del ejecutable actual ---
+# Retorna la ruta completa del archivo .exe que se está ejecutando
+# Ejemplo: "C:/mi_app/app.exe"
+func obtener_ruta_exe() -> cadena
+
+# --- Obtener directorio del ejecutable actual ---
+# Retorna el directorio donde está el archivo .exe
+# Ejemplo: "C:/mi_app/"
+func obtener_directorio_exe() -> cadena

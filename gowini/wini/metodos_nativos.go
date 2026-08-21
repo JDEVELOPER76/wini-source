@@ -3,6 +3,7 @@ package wini
 import (
 	"fmt"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -340,6 +341,34 @@ func listaMinimo(objeto interface{}, args []interface{}, kwargs map[string]inter
 		}
 	}
 	return minimo, nil
+}
+
+func listaABooleano(objeto interface{}, args []interface{}, kwargs map[string]interface{}) (interface{}, error) {
+	lista, ok := objeto.([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("no es una lista")
+	}
+	return len(lista) > 0, nil
+}
+
+// listaADiccionario convierte una lista de pares [clave, valor] en un
+// diccionario. Cada elemento de la lista debe ser a su vez una lista de
+// exactamente 2 elementos.
+func listaADiccionario(objeto interface{}, args []interface{}, kwargs map[string]interface{}) (interface{}, error) {
+	lista, ok := objeto.([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("no es una lista")
+	}
+	resultado := make(map[string]interface{}, len(lista))
+	for _, elem := range lista {
+		par, ok := elem.([]interface{})
+		if !ok || len(par) != 2 {
+			return nil, fmt.Errorf("a_diccionario requiere una lista de pares [clave, valor]")
+		}
+		clave := fmt.Sprintf("%v", par[0])
+		resultado[clave] = par[1]
+	}
+	return resultado, nil
 }
 
 // ============= MÉTODOS PARA CADENAS =============
@@ -779,6 +808,22 @@ func cadenaAcortar(objeto interface{}, args []interface{}, kwargs map[string]int
 	return cadena[:longitud] + sufijo, nil
 }
 
+func cadenaABooleano(objeto interface{}, args []interface{}, kwargs map[string]interface{}) (interface{}, error) {
+	cadena, ok := objeto.(string)
+	if !ok {
+		return nil, fmt.Errorf("no es una cadena")
+	}
+	valor := strings.ToLower(strings.TrimSpace(cadena))
+	switch valor {
+	case "verdadero", "true", "1", "si", "sí":
+		return true, nil
+	case "falso", "false", "0", "no", "":
+		return false, nil
+	default:
+		return len(valor) > 0, nil
+	}
+}
+
 // ============= MÉTODOS PARA DICCIONARIOS =============
 
 func diccObtener(objeto interface{}, args []interface{}, kwargs map[string]interface{}) (interface{}, error) {
@@ -1017,7 +1062,124 @@ func diccIncrementar(objeto interface{}, args []interface{}, kwargs map[string]i
 	return nuevoValor, nil
 }
 
+func diccABooleano(objeto interface{}, args []interface{}, kwargs map[string]interface{}) (interface{}, error) {
+	mapa, ok := objeto.(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("no es un diccionario")
+	}
+	return len(mapa) > 0, nil
+}
+
+func diccATexto(objeto interface{}, args []interface{}, kwargs map[string]interface{}) (interface{}, error) {
+	mapa, ok := objeto.(map[string]interface{})
+	if !ok {
+		return nil, fmt.Errorf("no es un diccionario")
+	}
+	partes := make([]string, 0, len(mapa))
+	for k, v := range mapa {
+		partes = append(partes, fmt.Sprintf("%s: %v", k, v))
+	}
+	// Orden estable por clave, ya que el orden de los mapas de Go no es
+	// determinista.
+	sort.Strings(partes)
+	return "{" + strings.Join(partes, ", ") + "}", nil
+}
+
+// ============= MÉTODOS PARA NÚMEROS =============
+
+func numeroAEntero(objeto interface{}, args []interface{}, kwargs map[string]interface{}) (interface{}, error) {
+	switch v := objeto.(type) {
+	case int:
+		return v, nil
+	case float64:
+		return int(v), nil
+	default:
+		return nil, fmt.Errorf("no es un número")
+	}
+}
+
+func numeroADecimal(objeto interface{}, args []interface{}, kwargs map[string]interface{}) (interface{}, error) {
+	switch v := objeto.(type) {
+	case int:
+		return float64(v), nil
+	case float64:
+		return v, nil
+	default:
+		return nil, fmt.Errorf("no es un número")
+	}
+}
+
+func numeroATexto(objeto interface{}, args []interface{}, kwargs map[string]interface{}) (interface{}, error) {
+	switch v := objeto.(type) {
+	case int:
+		return strconv.Itoa(v), nil
+	case float64:
+		return strconv.FormatFloat(v, 'f', -1, 64), nil
+	default:
+		return nil, fmt.Errorf("no es un número")
+	}
+}
+
+func numeroABooleano(objeto interface{}, args []interface{}, kwargs map[string]interface{}) (interface{}, error) {
+	switch v := objeto.(type) {
+	case int:
+		return v != 0, nil
+	case float64:
+		return v != 0, nil
+	default:
+		return nil, fmt.Errorf("no es un número")
+	}
+}
+
+// ============= MÉTODOS PARA BOOLEANOS =============
+
+func booleanoATexto(objeto interface{}, args []interface{}, kwargs map[string]interface{}) (interface{}, error) {
+	v, ok := objeto.(bool)
+	if !ok {
+		return nil, fmt.Errorf("no es un booleano")
+	}
+	if v {
+		return "verdadero", nil
+	}
+	return "falso", nil
+}
+
+func booleanoAEntero(objeto interface{}, args []interface{}, kwargs map[string]interface{}) (interface{}, error) {
+	v, ok := objeto.(bool)
+	if !ok {
+		return nil, fmt.Errorf("no es un booleano")
+	}
+	if v {
+		return 1, nil
+	}
+	return 0, nil
+}
+
+func booleanoADecimal(objeto interface{}, args []interface{}, kwargs map[string]interface{}) (interface{}, error) {
+	v, ok := objeto.(bool)
+	if !ok {
+		return nil, fmt.Errorf("no es un booleano")
+	}
+	if v {
+		return 1.0, nil
+	}
+	return 0.0, nil
+}
+
 // ============= REGISTRO DE MÉTODOS =============
+
+var MetodosNumero = map[string]MetodoNativo{
+	"a_entero":   numeroAEntero,
+	"a_decimal":  numeroADecimal,
+	"a_texto":    numeroATexto,
+	"a_booleano": numeroABooleano,
+}
+
+var MetodosBooleano = map[string]MetodoNativo{
+	"a_texto":   booleanoATexto,
+	"a_entero":  booleanoAEntero,
+	"a_decimal": booleanoADecimal,
+}
 
 var MetodosLista = map[string]MetodoNativo{
 	"agregar":         listaAgregar,
@@ -1039,6 +1201,8 @@ var MetodosLista = map[string]MetodoNativo{
 	"limpiar":         listaLimpiar,
 	"copiar":          listaCopiar,
 	"a_texto":         listaATexto,
+	"a_booleano":      listaABooleano,
+	"a_diccionario":   listaADiccionario,
 	"sumar":           listaSumar,
 	"maximo":          listaMaximo,
 	"minimo":          listaMinimo,
@@ -1068,6 +1232,7 @@ var MetodosCadena = map[string]MetodoNativo{
 	"a_entero":           cadenaAEntero,
 	"a_decimal":          cadenaADecimal,
 	"a_lista":            cadenaALista,
+	"a_booleano":         cadenaABooleano,
 	"es_numero":          cadenaEsNumero,
 	"es_digito":          cadenaEsDigito,
 	"es_alfabetico":      cadenaEsAlfabetico,
@@ -1099,6 +1264,8 @@ var MetodosDiccionario = map[string]MetodoNativo{
 	"a_lista_valores": diccAListaValores,
 	"defecto":         diccDefecto,
 	"incrementar":     diccIncrementar,
+	"a_texto":         diccATexto,
+	"a_booleano":      diccABooleano,
 }
 
 // ============= FUNCIONES AUXILIARES =============

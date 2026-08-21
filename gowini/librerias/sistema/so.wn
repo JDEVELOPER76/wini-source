@@ -1,0 +1,285 @@
+importar "os.dll" como os
+
+VERSION_OS = os.variables().OS_VERSION
+TEMP = os.variables().TEMP
+USUARIO = os.variables().USERNAME
+NOMBREPC = os.variables().COMPUTERNAME
+PATH_WINI = os.variables("PATH")
+EXE_PATH = os.obtener_directorio_exe()
+EXE_DIR = os.obtener_ruta_exe()
+
+
+#funciones desde la dll 
+
+funcion cmd(comando,stdout=verdadero,output=verdadero):
+    intentar:
+    si stdout:
+        retornar os.ejecutar(comando)
+    si stdout == falso:
+        retornar os.cmd(comando).exit_code
+    capturar error:
+        retornar c"Error al ejecutar la funcion : {error}"
+
+    
+funcion limpiar_pantalla():
+    intentar:
+        cmd("cls")
+    capturar error:
+        retornar c"Error al ejecutar la funcion : {error}"
+
+funcion ver_variables(nombre):
+    intentar:
+        si nombre == nulo:
+            retornar os.variables(nombre)
+        sino nombre:
+            retornar os.obtener_variable(nombre).dividir(";")
+    capturar error:
+        retornar c"Error al ejecutar la funcion : {error}"
+
+funcion establecer_variable(nombre , valor):
+    intentar:
+        retornar os.establecer_variable(nombre, valor)
+    capturar error:
+        retornar c"Error al ejecutar la funcion : {error}"
+
+funcion ver_archivos(ruta):
+    intentar:
+        retornar os.listar_archivos(ruta)
+    capturar error:
+        retornar c"Error al ejecutar la funcion : {error}"
+
+funcion archivo_existe(ruta):
+    intentar:
+        si ruta == nulo: 
+            retornar falso
+        si ruta == "":
+            retornar falso
+        sino ruta:
+            retornar os.archivo_existe(ruta)
+    capturar error:
+        retornar c"Error al ejecutar la funcion : {error}"
+
+funcion leer_archivo(ruta):
+    intentar: 
+        si ruta == nulo o ruta == "":
+            retornar falso
+        sino ruta:
+            retornar os.leer_archivo(ruta)
+    capturar error:
+        retornar c"Error al ejecutar la funcion : {error}"
+        
+funcion crear_archivo(nombre,contenido=""):
+    intentar:
+        si os.escribir_archivo(nombre,contenido):
+            retornar verdadero
+        sino os.escribir_archivo(nombre,contenido) == falso:
+            retornar falso
+    capturar error:
+        retornar c"Error al ejecutar la funcion : {error}"
+
+funcion escribir_archivo(nombre,contenido=""):
+    intentar :
+        si os.escribir_archivo(nombre,contenido) == verdadero:
+        retornar verdadero
+    sino os.escribir_archivo(nombre,contenido) == falso:
+        retornar falso
+    capturar error:
+        retornar c"Error al ejecutar la funcion : {error}"
+
+funcion agregrar_a_archivo(nombre,contenido):
+    intentar:
+        si nombre == nulo o nombre == "":
+            retornar falso
+        sino contenido == nulo:
+            retornar falso
+        sino nombre y contenido:
+            retornar os.agregar_alarchivo(nombre,contenido)
+
+funcion remover_archivo(nombre):
+    intentar:
+        si nombre == "" o nombre == nulo:
+            retornar nulo
+        sino nombre:
+            retornar cmd(c"del {nombre}")
+    capturar error:
+        retornar c"Error al ejecutar la funcion : {error}"
+
+funcion copiar_archivo(origen,destino):
+    intentar:
+        si origen y destino:
+            retornar os.copiar_archivo(origen,destino)
+    capturar error:
+        retornar c"Error al ejecutar la funcion : {error}"
+
+funcion mover_archivo(origen,destino):
+    intentar:
+        si origen y destino:
+            retornar os.mover_archivo(origen,destino)
+    capturar error:
+        retornar c"Error al ejecutar la funcion : {error}"
+
+funcion info_archivo(ruta):
+    intentar:
+        si ruta:
+            retornar os.info_archivo(ruta)
+        demas:
+            retornar falso
+    capturar error:
+        retornar c"Error al ejecutar la funcion : {error}"
+
+funcion crear_carpeta(ruta):
+    intentar:
+        si ruta:
+            retornar os.crear_directorio(ruta)
+        demas:
+            retornar falso
+    capturar error:
+        retornar c"Error al ejecutar la funcion : {error}"
+
+funcion eliminar_carpeta(ruta):
+    intentar:
+        si ruta:
+            retornar os.eliminar_directorio(ruta)
+    capturar error:
+        retornar c"Error al ejecutar la funcion : {error}"
+
+funcion remover_carpeta(ruta):
+    intentar:
+        si ruta:
+            cmd(c"powershell -Command Remove-Item -Path {ruta} -Recurse -Force")
+    capturar error:
+        retornar c"Error al ejecutar la funcion : {error}"
+
+funcion carpeta_actual():
+    intentar:
+        retornar os.obtener_directorio()
+    capturar error:
+        retornar c"Error al ejecutar la funcion : {error}"
+
+funcion establecer_directorio(ruta):
+    intentar:
+        si ruta:
+            retornar os.establecer_directorio(ruta)
+    capturar error:
+        retornar c"Error al ejecutar la funcion : {error}"
+
+funcion obtener_discos():
+    intentar:
+        retornar os.obtener_unidades()
+    capturar error:
+        retornar c"Error al ejecutar la funcion : {error}"
+
+funcion info_disco(disco):
+    intentar:
+        si disco:
+            retornar os.info_unidad(disco)
+        demas:
+            retornar os.info_unidad(disco)
+    capturar error:
+        retornar c"Error al ejecutar la funcion : {error}"
+
+funcion obtener_pid():
+    intentar:
+        retornar os.obtener_pid()
+    capturar error:
+        retornar c"Error al ejecutar la funcion : {error}"
+    
+funcion obtener_procesos():
+    intentar:
+        retornar os.obtener_procesos()
+    capturar error:
+        retornar c"Error al ejecutar la funcion : {error}"
+
+funcion detener_proceso(pid):
+    intentar:
+        si tipo(pid) != "entero":
+            retornar c"Error: El PID debe ser un número entero."
+        sino pid:
+            retornar os.matar_proceso(pid)
+    capturar error:
+        retornar c"Error al ejecutar la funcion : {error}"
+
+funcion info_memoria():
+    intentar:
+        retornar os.info_memoria()
+    capturar error:
+        retornar c"Error al ejecutar la funcion : {error}"
+
+funcion info_cpu():
+    intentar:
+        retornar os.info_cpu()
+    capturar error:
+        retornar c"Error al ejecutar la funcion : {error}"
+
+funcion esperar(segundos=0):
+    intentar:
+        si no segundos:
+            lanzar (c"'segundos' espera 1 parametro pero recibio 0")
+        si tipo(segundos) == "entero" o "decimal":
+            os.dormir(segundos*1000)
+    capturar error:
+        retornar c"Error al ejecutar la funcion : {error}"
+
+funcion obtener_tiempo():
+    intentar:
+        retornar os.obtener_tiempo()
+    capturar error:
+        retornar c"Error al ejecutar la funcion : {error}"
+funcion nombre_usuario():
+    intentar:
+        retornar os.obtener_usuario()
+    capturar error:
+        retornar c"Error al ejecutar la funcion : {error}"
+
+funcion nombre_pc():
+    intentar:
+        retornar os.obtener_computadora()
+    capturar error:
+        retornar c"Error al ejecutar la funcion : {error}"
+
+funcion us_es_admin():
+    intentar:
+        retornar os.es_admin()
+    capturar error:
+        retornar c"Error al ejecutar la funcion : {error}"
+
+funcion abrir_url(url):
+    intentar:
+        si url:
+            retornar os.abrir_url(url)
+        sino no url:
+            lanzar("La funcion espera 1 parametro 'url' pero recibio 0")
+    capturar error:
+        retornar c"Error al ejecutar la funcion : {error}"
+
+funcion beep(frecuencia,duracion):
+    intentar:
+        si frecuencia y duracion:
+            retornar os.beep(frecuencia,duracion)
+    capturar error:
+        retornar c"Error al ejecutar la funcion : {error}"
+
+funcion obtener_portapapeles():
+    intentar:
+        retornar os.obtener_portapapeles()
+    capturar error:
+        retornar c"Error al ejecutar la funcion : {error}"
+
+funcion establecer_portapapeles(texto):
+    intentar:
+        si texto:
+            retornar os.establecer_portapapeles(texto)
+    capturar error:
+        retornar c"Error al ejecutar la funcion : {error}"
+
+funcion obtener_ruta_exe():
+    intentar:
+        retornar os.obtener_ruta_exe()
+    capturar error:
+        retornar c"Error al ejecutar la funcion : {error}"
+
+funcion obtener_directorio_exe():
+    intentar:
+        retornar os.obtener_directorio_exe()
+    capturar error:
+        retornar c"Error al ejecutar la funcion : {error}"

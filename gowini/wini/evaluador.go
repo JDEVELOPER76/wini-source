@@ -82,8 +82,16 @@ func FormatearTexto(valor interface{}) string {
 			pares = append(pares, fmt.Sprintf("%s: %s", FormatearTexto(k), FormatearTexto(val)))
 		}
 		return "{" + strings.Join(pares, ", ") + "}"
-	case int, int64, float64:
+	case int:
+		return fmt.Sprintf("%d", v)
+	case float64:
+		// Si es un entero (sin parte decimal), mostrar con .0
+		if v == float64(int(v)) {
+			return fmt.Sprintf("%.1f", v)
+		}
 		return fmt.Sprintf("%v", v)
+	case int64:
+		return fmt.Sprintf("%d", v)
 	default:
 		return fmt.Sprintf("%v", v)
 	}
@@ -389,7 +397,7 @@ func (e *Evaluador) evIn(nodo *Nodo) interface{} {
 	default:
 		panic(&RuntimeError{
 			ErrorConLinea: ErrorConLinea{
-				Mensaje: fmt.Sprintf("Operador 'in' no soportado entre %T y %T", izquierda, derecha),
+				Mensaje: fmt.Sprintf("Operador 'en' no soportado entre %T y %T", izquierda, derecha),
 				Linea:   &linea,
 			},
 		})
@@ -463,19 +471,32 @@ func (e *Evaluador) evaluarBinaria(nodo *Nodo) interface{} {
 		}
 		// Suma numérica
 		if izqIsFloat || derIsFloat {
-			return izqFloat + derFloat
+			resultado := izqFloat + derFloat
+			// Si el resultado es un entero, devolver como int
+			if resultado == float64(int(resultado)) {
+				return int(resultado)
+			}
+			return resultado
 		}
 		return int(izqInt + derInt)
 
 	case "-":
 		if izqIsFloat || derIsFloat {
-			return izqFloat - derFloat
+			resultado := izqFloat - derFloat
+			if resultado == float64(int(resultado)) {
+				return int(resultado)
+			}
+			return resultado
 		}
 		return int(izqInt - derInt)
 
 	case "*":
 		if izqIsFloat || derIsFloat {
-			return izqFloat * derFloat
+			resultado := izqFloat * derFloat
+			if resultado == float64(int(resultado)) {
+				return int(resultado)
+			}
+			return resultado
 		}
 		return int(izqInt * derInt)
 
@@ -497,7 +518,9 @@ func (e *Evaluador) evaluarBinaria(nodo *Nodo) interface{} {
 			})
 		}
 		if izqIsFloat || derIsFloat {
-			return izqFloat / derFloat
+			resultado := izqFloat / derFloat
+			// La división SIEMPRE devuelve decimal
+			return resultado
 		}
 		return float64(izqInt) / float64(derInt)
 
@@ -511,7 +534,8 @@ func (e *Evaluador) evaluarBinaria(nodo *Nodo) interface{} {
 			})
 		}
 		if izqIsFloat || derIsFloat {
-			return int(izqFloat) % int(derFloat)
+			resultado := int(izqFloat) % int(derFloat)
+			return resultado
 		}
 		return int(izqInt % derInt)
 

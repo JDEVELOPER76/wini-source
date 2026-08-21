@@ -28,12 +28,19 @@ WINI_API WiniValor wini_crear_decimal(double valor) {
 }
 
 WINI_API WiniValor wini_crear_booleano(bool valor) {
-    WiniValor v;
+    // IMPORTANTE: `v` debe inicializarse a cero antes de tocar `booleano`.
+    // `booleano` es un uint8_t dentro de la unión de 8 bytes de WiniValor
+    // (compartida con entero/decimal/cadena/puntero). Si `v` no se limpia
+    // primero, sólo se escribe 1 de los 8 bytes de la unión y los otros 7
+    // quedan con basura de la pila. El lado Go lee la unión completa como
+    // un uint64 (`datos`) y decide el valor booleano con `datos != 0`, así
+    // que esa basura hacía que el resultado fuera casi siempre "verdadero",
+    // sin importar el valor real de `valor`.
+    WiniValor v = {};
     v.tipo = WINI_TIPO_BOOLEANO;
-    v.booleano = valor;
+    v.booleano = valor ? 1 : 0;  // uint8_t
     return v;
 }
-
 WINI_API WiniValor wini_crear_cadena(const char* valor) {
     WiniValor v;
     v.tipo = WINI_TIPO_CADENA;

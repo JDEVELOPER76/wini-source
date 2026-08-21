@@ -65,6 +65,23 @@ type ErrorMatematico struct {
 	ErrorConLinea
 }
 
+// ErrorPersonalizado permite lanzar/capturar tipos de error definidos por
+// el usuario en código Wini (cualquier nombre que no sea uno de los tipos
+// nativos), por ejemplo: lanzar ErrorJSON("mensaje") / capturar ErrorJSON
+// como err:
+type ErrorPersonalizado struct {
+	ErrorConLinea
+	Tipo string
+}
+
+func (e *ErrorPersonalizado) Error() string {
+	base := fmt.Sprintf("%s: %s", e.Tipo, e.Mensaje)
+	if e.Linea != nil {
+		base += fmt.Sprintf(" (línea %d)", *e.Linea)
+	}
+	return base
+}
+
 // RetornoException es una excepción para manejar retornos dentro de funciones
 type RetornoException struct {
 	Valor interface{}

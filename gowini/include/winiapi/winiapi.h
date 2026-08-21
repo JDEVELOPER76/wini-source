@@ -37,9 +37,9 @@ typedef struct {
     union {
         int64_t entero;
         double decimal;
-        bool booleano;
-        char* cadena;      // Debe ser liberado con wini_free_string
-        void* puntero;     // Para lista, diccionario, función
+        uint8_t booleano;   // ← CAMBIADO DE bool a uint8_t
+        char* cadena;
+        void* puntero;
     };
 } WiniValor;
 

@@ -54,6 +54,10 @@ WiniValor wini_beep(WiniValor* args, int num_args);
 WiniValor wini_get_clipboard(WiniValor* args, int num_args);
 WiniValor wini_set_clipboard(WiniValor* args, int num_args);
 
+// ===== NUEVAS FUNCIONES PARA RUTA DEL EJECUTABLE =====
+WiniValor wini_get_exe_path(WiniValor* args, int num_args);
+WiniValor wini_get_exe_dir(WiniValor* args, int num_args);
+
 // ===== VARIABLES GLOBALES DEL MÓDULO =====
 static WiniContexto g_contexto = nullptr;
 
@@ -85,6 +89,59 @@ std::string format_file_time(FILETIME ft) {
     return std::string(buffer);
 }
 
+WiniValor wini_get_vars(WiniValor* args, int num_args) {
+    WiniValor vars = wini_get_variable(g_contexto, "__vars__");
+    if (vars.tipo == WINI_TIPO_NINGUNO) {
+        // Si no existe, crearlo con valores por defecto
+        WiniValor claves[4];
+        WiniValor valores[4];
+        
+        claves[0] = wini_crear_cadena("OS_VERSION");
+        valores[0] = wini_crear_cadena(getenv("OS") ? getenv("OS") : "Windows");
+        
+        claves[1] = wini_crear_cadena("USERNAME");
+        valores[1] = wini_crear_cadena(getenv("USERNAME") ? getenv("USERNAME") : "");
+        
+        claves[2] = wini_crear_cadena("COMPUTERNAME");
+        valores[2] = wini_crear_cadena(getenv("COMPUTERNAME") ? getenv("COMPUTERNAME") : "");
+        
+        claves[3] = wini_crear_cadena("TEMP");
+        valores[3] = wini_crear_cadena(getenv("TEMP") ? getenv("TEMP") : "");
+        
+        vars = wini_crear_diccionario(claves, valores, 4);
+        wini_set_variable(g_contexto, "__vars__", vars);
+    }
+    return vars;
+}
+
+// ===== FUNCIONES PARA OBTENER RUTA DEL EJECUTABLE =====
+
+WiniValor wini_get_exe_path(WiniValor* args, int num_args) {
+    char buffer[MAX_PATH];
+    DWORD size = GetModuleFileNameA(NULL, buffer, MAX_PATH);
+    if (size > 0) {
+        std::string path(buffer);
+        std::replace(path.begin(), path.end(), '\\', '/');
+        return wini_crear_cadena(path.c_str());
+    }
+    return wini_crear_ninguno();
+}
+
+WiniValor wini_get_exe_dir(WiniValor* args, int num_args) {
+    char buffer[MAX_PATH];
+    DWORD size = GetModuleFileNameA(NULL, buffer, MAX_PATH);
+    if (size > 0) {
+        std::string path(buffer);
+        std::replace(path.begin(), path.end(), '\\', '/');
+        size_t lastSlash = path.find_last_of('/');
+        if (lastSlash != std::string::npos) {
+            path = path.substr(0, lastSlash + 1);
+        }
+        return wini_crear_cadena(path.c_str());
+    }
+    return wini_crear_ninguno();
+}
+
 // ===== INICIALIZACIÓN DEL MÓDULO =====
 WINI_API bool wini_module_init(WiniContexto ctx, void* (*registrar)(const char* nombre, void* fn)) {
     g_contexto = ctx;
@@ -98,7 +155,7 @@ WINI_API bool wini_module_init(WiniContexto ctx, void* (*registrar)(const char* 
     registrar("archivo_existe", (void*)wini_file_exists);
     registrar("leer_archivo", (void*)wini_read_file);
     registrar("escribir_archivo", (void*)wini_write_file);
-    registrar("anadir_archivo", (void*)wini_append_file);
+    registrar("agregar_alarchivo", (void*)wini_append_file);
     registrar("eliminar_archivo", (void*)wini_delete_file);
     registrar("copiar_archivo", (void*)wini_copy_file);
     registrar("mover_archivo", (void*)wini_move_file);
@@ -124,25 +181,85 @@ WINI_API bool wini_module_init(WiniContexto ctx, void* (*registrar)(const char* 
     registrar("beep", (void*)wini_beep);
     registrar("obtener_portapapeles", (void*)wini_get_clipboard);
     registrar("establecer_portapapeles", (void*)wini_set_clipboard);
+    registrar("variables", (void*)wini_get_vars);
+    registrar("obtener_ruta_exe", (void*)wini_get_exe_path);
+    registrar("obtener_directorio_exe", (void*)wini_get_exe_dir);
 
+    // ===== CREAR DICCIONARIO DE VARIABLES =====
+    WiniValor claves_vars[6];
+    WiniValor valores_vars[6];
+    int idx = 0;
     
-    // Variables del sistema
+    // OS_VERSION
     char* os_name = getenv("OS");
-    wini_set_variable(ctx, "OS_VERSION", wini_crear_cadena(os_name ? os_name : "Windows"));
+    claves_vars[idx] = wini_crear_cadena("OS_VERSION");
+    valores_vars[idx] = wini_crear_cadena(os_name ? os_name : "Windows");
+    idx++;
     
-    // Obtener versión de Windows
+    // WINDOWS_VERSION
     OSVERSIONINFOEXW osvi = { sizeof(OSVERSIONINFOEXW) };
     if (GetVersionExW((LPOSVERSIONINFOW)&osvi)) {
         char version[100];
         sprintf_s(version, sizeof(version), "Windows %d.%d (Build %d)", 
                  osvi.dwMajorVersion, osvi.dwMinorVersion, osvi.dwBuildNumber);
-        wini_set_variable(ctx, "WINDOWS_VERSION", wini_crear_cadena(version));
+        claves_vars[idx] = wini_crear_cadena("WINDOWS_VERSION");
+        valores_vars[idx] = wini_crear_cadena(version);
+        idx++;
     }
     
-    // Variables de entorno útiles
-    wini_set_variable(ctx, "TEMP", wini_crear_cadena(getenv("TEMP") ? getenv("TEMP") : ""));
+    // USERNAME
+    claves_vars[idx] = wini_crear_cadena("USERNAME");
+    valores_vars[idx] = wini_crear_cadena(getenv("USERNAME") ? getenv("USERNAME") : "");
+    idx++;
+    
+    // COMPUTERNAME
+    claves_vars[idx] = wini_crear_cadena("COMPUTERNAME");
+    valores_vars[idx] = wini_crear_cadena(getenv("COMPUTERNAME") ? getenv("COMPUTERNAME") : "");
+    idx++;
+    
+    // EXE_PATH (ruta del ejecutable)
+    char exePath[MAX_PATH];
+    DWORD size = GetModuleFileNameA(NULL, exePath, MAX_PATH);
+    if (size > 0) {
+        std::string path(exePath);
+        std::replace(path.begin(), path.end(), '\\', '/');
+        claves_vars[idx] = wini_crear_cadena("EXE_PATH");
+        valores_vars[idx] = wini_crear_cadena(path.c_str());
+        idx++;
+        
+        // EXE_DIR (directorio del ejecutable)
+        size_t lastSlash = path.find_last_of('/');
+        if (lastSlash != std::string::npos) {
+            path = path.substr(0, lastSlash + 1);
+        }
+        claves_vars[idx] = wini_crear_cadena("EXE_DIR");
+        valores_vars[idx] = wini_crear_cadena(path.c_str());
+        idx++;
+    }
+    
+    // Crear diccionario de variables y guardarlo en el contexto
+    WiniValor vars_dict = wini_crear_diccionario(claves_vars, valores_vars, idx);
+    wini_set_variable(ctx, "__vars__", vars_dict);
+    
+    // También establecer como variables de entorno para compatibilidad
+    wini_set_variable(ctx, "OS_VERSION", wini_crear_cadena(os_name ? os_name : "Windows"));
     wini_set_variable(ctx, "USERNAME", wini_crear_cadena(getenv("USERNAME") ? getenv("USERNAME") : ""));
     wini_set_variable(ctx, "COMPUTERNAME", wini_crear_cadena(getenv("COMPUTERNAME") ? getenv("COMPUTERNAME") : ""));
+    
+    // Establecer EXE_PATH y EXE_DIR como variables del contexto
+    char exePath2[MAX_PATH];
+    DWORD size2 = GetModuleFileNameA(NULL, exePath2, MAX_PATH);
+    if (size2 > 0) {
+        std::string path(exePath2);
+        std::replace(path.begin(), path.end(), '\\', '/');
+        wini_set_variable(ctx, "EXE_PATH", wini_crear_cadena(path.c_str()));
+        
+        size_t lastSlash = path.find_last_of('/');
+        if (lastSlash != std::string::npos) {
+            path = path.substr(0, lastSlash + 1);
+        }
+        wini_set_variable(ctx, "EXE_DIR", wini_crear_cadena(path.c_str()));
+    }
     
     return true;
 }
@@ -150,6 +267,8 @@ WINI_API bool wini_module_init(WiniContexto ctx, void* (*registrar)(const char* 
 WINI_API void wini_module_cleanup(WiniContexto ctx) {
     g_contexto = nullptr;
 }
+
+
 
 // ===== FUNCIONES DEL MÓDULO =====
 
@@ -231,21 +350,29 @@ WiniValor wini_system(WiniValor* args, int num_args) {
     return wini_crear_entero(resultado);
 }
 
-// Obtener variable de entorno
+// Modificar wini_getenv para que también pueda obtener variables del contexto
 WiniValor wini_getenv(WiniValor* args, int num_args) {
     if (num_args < 1 || args[0].tipo != WINI_TIPO_CADENA) {
         return wini_crear_ninguno();
     }
     
     std::string nombre = args[0].cadena ? args[0].cadena : "";
-    std::wstring wnombre = string_to_wstring(nombre);
     
+    // 1. Buscar en el contexto
+    WiniValor ctx_val = wini_get_variable(g_contexto, nombre.c_str());
+    if (ctx_val.tipo != WINI_TIPO_NINGUNO) {
+        return ctx_val;
+    }
+    
+    // 2. Buscar en variables de entorno del sistema
+    std::wstring wnombre = string_to_wstring(nombre);
     DWORD size = GetEnvironmentVariableW(wnombre.c_str(), NULL, 0);
     if (size > 0) {
         std::wstring wvalor(size, L'\0');
         GetEnvironmentVariableW(wnombre.c_str(), &wvalor[0], size);
         return wini_crear_cadena(wstring_to_string(wvalor).c_str());
     }
+    
     return wini_crear_ninguno();
 }
 
@@ -308,14 +435,49 @@ WiniValor wini_list_files(WiniValor* args, int num_args) {
     return wini_crear_lista(archivos.data(), (int)archivos.size());
 }
 
+
+
 // Verificar si un archivo existe
 WiniValor wini_file_exists(WiniValor* args, int num_args) {
-    if (num_args < 1 || args[0].tipo != WINI_TIPO_CADENA || !args[0].cadena) {
-        return wini_crear_booleano(false);
+    bool existe = false;
+    
+    // Validar argumentos
+    if (num_args >= 1 && args[0].tipo == WINI_TIPO_CADENA && args[0].cadena) {
+        std::string ruta = args[0].cadena;
+        
+        // Limpiar comillas
+        if (ruta.length() >= 2) {
+            if ((ruta.front() == '"' && ruta.back() == '"') ||
+                (ruta.front() == '\'' && ruta.back() == '\'')) {
+                ruta = ruta.substr(1, ruta.length() - 2);
+            }
+        }
+        
+        // Verificar si la ruta no está vacía
+        if (!ruta.empty()) {
+            // Intentar con GetFileAttributesA
+            DWORD attrs = GetFileAttributesA(ruta.c_str());
+            
+            if (attrs != INVALID_FILE_ATTRIBUTES) {
+                existe = true;
+            } else {
+                // Si falló, probar con ruta absoluta
+                char fullPath[MAX_PATH];
+                if (GetFullPathNameA(ruta.c_str(), MAX_PATH, fullPath, NULL) > 0) {
+                    attrs = GetFileAttributesA(fullPath);
+                    if (attrs != INVALID_FILE_ATTRIBUTES) {
+                        existe = true;
+                    }
+                }
+            }
+        }
     }
     
-    DWORD attrs = GetFileAttributesA(args[0].cadena);
-    return wini_crear_booleano(attrs != INVALID_FILE_ATTRIBUTES);
+    // Retornar como BOOLEANO con la unión inicializada a cero
+    WiniValor resultado = {};
+    resultado.tipo = WINI_TIPO_BOOLEANO;
+    resultado.booleano = existe ? 1 : 0;
+    return resultado;
 }
 
 // Leer archivo

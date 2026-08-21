@@ -1,0 +1,56 @@
+# zip.exp - Módulo ZIP para Wini
+
+# ===== FUNCIONES =====
+
+# Crear un archivo ZIP vacío
+func crear(nombre_zip:cadena) -> booleano
+
+# Agregar archivo al ZIP
+func agregar(nombre_zip:cadena, archivo_origen:cadena) -> booleano
+
+# Extraer todos los archivos del ZIP
+func extraer(nombre_zip:cadena, destino:cadena) -> booleano
+
+# Listar contenido del ZIP
+func listar(nombre_zip:cadena) -> lista
+# Retorna: lista de {nombre: cadena, volumen: entero, comprimido: entero}
+
+# Eliminar archivo del ZIP
+func eliminar(nombre_zip:cadena, archivo:cadena) -> booleano
+
+# Renombrar archivo dentro del ZIP
+func renombrar(nombre_zip:cadena, viejo:cadena, nuevo:cadena) -> booleano
+
+# Agregar directorio al ZIP
+func agregar_directorio(nombre_zip:cadena, directorio:cadena) -> booleano
+
+# Agregar archivo desde memoria (sin archivo físico)
+func agregar_desde_memoria(nombre_zip:cadena, nombre_interno:cadena, contenido:cadena) -> booleano
+
+# Obtener información de un archivo en el ZIP
+func info_archivo(nombre_zip:cadena, archivo:cadena) -> diccionario|ninguno
+# Retorna: {nombre: cadena, volumen: entero, comprimido: entero, metodo_compresion: entero, crc32: entero, modificado: entero, indice: entero}
+
+# Establecer comentario del ZIP
+func establecer_comentario(nombre_zip:cadena, comentario:cadena) -> booleano
+
+# Obtener comentario del ZIP
+func obtener_comentario(nombre_zip:cadena) -> cadena|ninguno
+
+# Agregar carpeta completa al ZIP
+func agregar_carpeta(nombre_zip:cadena, carpeta:cadena) -> booleano
+
+# Establecer contraseña para el ZIP
+func establecer_password(nombre_zip:cadena, password:cadena) -> booleano
+
+# Extraer con contraseña
+func extraer_con_password(nombre_zip:cadena, destino:cadena, password:cadena) -> booleano
+
+# Agregar archivo encriptado con contraseña
+func agregar_encriptado(nombre_zip:cadena, archivo:cadena, password:cadena) -> booleano
+
+# Contar archivos en el ZIP
+func contar(nombre_zip:cadena) -> entero
+
+# Verificar si el ZIP contiene un archivo
+func contiene(nombre_zip:cadena, archivo:cadena) -> booleano

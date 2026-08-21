@@ -167,7 +167,21 @@ func (p *Parser) Parse() *Nodo {
 			p.tokenSiguiente()
 			continue
 		}
-		sentencias = append(sentencias, p.parsearSentencia(nil))
+		sent := p.parsearSentencia(nil)
+		if sent == nil {
+			tok := p.tokenActual()
+			linea := 0
+			if tok != nil {
+				linea = tok.Linea
+			}
+			panic(&SintaxisError{
+				ErrorConLinea: ErrorConLinea{
+					Mensaje: fmt.Sprintf("Sentencia inesperada o palabra reservada fuera de contexto: %v", tok),
+					Linea:   &linea,
+				},
+			})
+		}
+		sentencias = append(sentencias, sent)
 	}
 	return NewNodo("PROGRAMA", nil, 0).AgregarHijo(sentencias...)
 }
@@ -515,7 +529,7 @@ func (p *Parser) parsearSi(palabrasParada map[string]bool) *Nodo {
 			p.tokenSiguiente()
 			continue
 		}
-		if token.Tipo == PALABRA_CLAVE && token.Valor == "sino" {
+		if token.Tipo == PALABRA_CLAVE && (token.Valor == "sino" || token.Valor == "demas") {
 			break
 		}
 		sent := p.parsearSentencia(nil)
@@ -525,116 +539,152 @@ func (p *Parser) parsearSi(palabrasParada map[string]bool) *Nodo {
 		bloqueSi = append(bloqueSi, sent)
 	}
 
-	// Bloque SINO (opcional). Se "espía" hacia adelante sin consumir de forma
-	// permanente los saltos de línea: si lo que sigue no es 'sino', el salto
-	// de línea que marca el des-sangrado debe quedar disponible para quien
-	// llamó a parsearSi (funcion/para/mientras/otro si/intentar).
-	bloqueSino := []*Nodo{}
-	idxSiguiente := p.primerTokenNoNuevaLinea(p.posicion)
-	if idxSiguiente < len(p.tokens) && p.tokens[idxSiguiente].Tipo == PALABRA_CLAVE && p.tokens[idxSiguiente].Valor == "sino" {
-		p.posicion = idxSiguiente
-		p.esperado(PALABRA_CLAVE) // sino
-
-		// Soporta tres formas:
-		// 1) sino:
-		// 2) sino si condicion:
-		// 3) sino condicion:
-		tokTrasSino := p.tokenActual()
-		if tokTrasSino != nil && tokTrasSino.Tipo == PUNTOS {
-			p.esperado(PUNTOS)
-
-			if p.tokenActual() == nil || p.tokenActual().Tipo != NUEVA_LINEA {
-				panic(&SintaxisError{
-					ErrorConLinea: ErrorConLinea{
-						Mensaje: "Se esperaba un salto de línea después de ':'",
-						Linea:   &linea,
-					},
-				})
-			}
-
-			indentacionSino := indentacionDeToken(p.tokenActual())
-			if indentacionSino < 0 {
-				panic(&SintaxisError{
-					ErrorConLinea: ErrorConLinea{
-						Mensaje: "Se esperaba un salto de línea con indentación después de ':'",
-						Linea:   &linea,
-					},
-				})
-			}
-			p.esperado(NUEVA_LINEA)
-
-			for p.tokenActual() != nil {
-				token := p.tokenActual()
-				if token.Tipo == NUEVA_LINEA {
-					if indentacionDeToken(token) < indentacionSino {
-						break
-					}
-					p.tokenSiguiente()
-					continue
-				}
-				sent := p.parsearSentencia(nil)
-				if sent == nil {
-					break
-				}
-				bloqueSino = append(bloqueSino, sent)
-			}
-		} else {
-			if p.tokenActual() != nil && p.tokenActual().Tipo == PALABRA_CLAVE && p.tokenActual().Valor == "si" {
-				p.esperado(PALABRA_CLAVE)
-			}
-
-			condicionSino := p.parsearExpresion()
-			p.esperado(PUNTOS)
-
-			if p.tokenActual() == nil || p.tokenActual().Tipo != NUEVA_LINEA {
-				panic(&SintaxisError{
-					ErrorConLinea: ErrorConLinea{
-						Mensaje: "Se esperaba un salto de línea después de ':'",
-						Linea:   &linea,
-					},
-				})
-			}
-
-			indentacionSinoCond := indentacionDeToken(p.tokenActual())
-			if indentacionSinoCond < 0 {
-				panic(&SintaxisError{
-					ErrorConLinea: ErrorConLinea{
-						Mensaje: "Se esperaba un salto de línea con indentación después de ':'",
-						Linea:   &linea,
-					},
-				})
-			}
-			p.esperado(NUEVA_LINEA)
-
-			bloqueSinoCond := []*Nodo{}
-			for p.tokenActual() != nil {
-				token := p.tokenActual()
-				if token.Tipo == NUEVA_LINEA {
-					if indentacionDeToken(token) < indentacionSinoCond {
-						break
-					}
-					p.tokenSiguiente()
-					continue
-				}
-				sent := p.parsearSentencia(nil)
-				if sent == nil {
-					break
-				}
-				bloqueSinoCond = append(bloqueSinoCond, sent)
-			}
-
-			nodoSinoSi := NewNodo("SI", nil, linea).
-				AgregarHijo(condicionSino).
-				AgregarHijo(NewNodo("BLOQUE_SI", nil, linea).AgregarHijo(bloqueSinoCond...)).
-				AgregarHijo(NewNodo("BLOQUE_SINO", nil, linea))
-			bloqueSino = append(bloqueSino, nodoSinoSi)
-		}
-	}
+	// Bloque SINO (opcional), incluyendo toda la cadena de 'sino si ... / sino'.
+	bloqueSino := p.parsearClausulaSino(linea)
 
 	return NewNodo("SI", nil, linea).
 		AgregarHijo(condicion).
 		AgregarHijo(NewNodo("BLOQUE_SI", nil, linea).AgregarHijo(bloqueSi...)).
 		AgregarHijo(NewNodo("BLOQUE_SINO", nil, linea).AgregarHijo(bloqueSino...))
+}
+
+// parsearClausulaSino parsea la cadena de cláusulas 'sino'/'sino si'
+// (siempre else-if: exigen condición) y, al cerrar la cadena, una cláusula
+// terminal 'demas' opcional (else puro, sin condición). 'demas' nunca puede
+// seguir siendo encadenado con más 'sino'/'demas': es siempre el final.
+// Se "espía" hacia adelante sin consumir de forma permanente los saltos de
+// línea: si lo que sigue no es 'sino' ni 'demas', el salto de línea que marca
+// el des-sangrado debe quedar disponible para quien llamó a parsearSi
+// (funcion/para/mientras/demas si/intentar).
+func (p *Parser) parsearClausulaSino(lineaSi int) []*Nodo {
+	idxSiguiente := p.primerTokenNoNuevaLinea(p.posicion)
+	if idxSiguiente >= len(p.tokens) || p.tokens[idxSiguiente].Tipo != PALABRA_CLAVE {
+		return []*Nodo{}
+	}
+
+	switch p.tokens[idxSiguiente].Valor {
+	case "demas":
+		return p.parsearClausulademas(idxSiguiente, lineaSi)
+	case "sino":
+		return p.parsearClausulaSinoSi(idxSiguiente, lineaSi)
+	default:
+		return []*Nodo{}
+	}
+}
+
+// parsearClausulademas parsea la cláusula terminal 'demas:' (else puro, sin
+// condición). Al no llevar condición, no hay nada que encadenar después: si
+// aparece un 'sino' u demas 'demas' tras este bloque, se queda sin consumir
+// para que el llamador decida qué hacer con él.
+func (p *Parser) parsearClausulademas(idxdemas int, lineaSi int) []*Nodo {
+	p.posicion = idxdemas
+	p.esperado(PALABRA_CLAVE) // demas
+	p.esperado(PUNTOS)
+
+	if p.tokenActual() == nil || p.tokenActual().Tipo != NUEVA_LINEA {
+		panic(&SintaxisError{
+			ErrorConLinea: ErrorConLinea{
+				Mensaje: "Se esperaba un salto de línea después de ':'",
+				Linea:   &lineaSi,
+			},
+		})
+	}
+
+	indentaciondemas := indentacionDeToken(p.tokenActual())
+	if indentaciondemas < 0 {
+		panic(&SintaxisError{
+			ErrorConLinea: ErrorConLinea{
+				Mensaje: "Se esperaba un salto de línea con indentación después de ':'",
+				Linea:   &lineaSi,
+			},
+		})
+	}
+	p.esperado(NUEVA_LINEA)
+
+	bloque := []*Nodo{}
+	for p.tokenActual() != nil {
+		token := p.tokenActual()
+		if token.Tipo == NUEVA_LINEA {
+			if indentacionDeToken(token) < indentaciondemas {
+				break
+			}
+			p.tokenSiguiente()
+			continue
+		}
+		sent := p.parsearSentencia(nil)
+		if sent == nil {
+			break
+		}
+		bloque = append(bloque, sent)
+	}
+	return bloque
+}
+
+// parsearClausulaSinoSi parsea 'sino condicion:' / 'sino si condicion:'
+// (equivalentes: 'si' es azúcar opcional) y sigue buscando, tras su bloque,
+// más 'sino'/'sino si' encadenados o un 'demas' final.
+func (p *Parser) parsearClausulaSinoSi(idxSino int, lineaSi int) []*Nodo {
+	p.posicion = idxSino
+	p.esperado(PALABRA_CLAVE) // sino
+
+	if p.tokenActual() != nil && p.tokenActual().Tipo == PALABRA_CLAVE && p.tokenActual().Valor == "si" {
+		p.esperado(PALABRA_CLAVE)
+	}
+
+	condicionSino := p.parsearExpresion()
+	p.esperado(PUNTOS)
+
+	if p.tokenActual() == nil || p.tokenActual().Tipo != NUEVA_LINEA {
+		panic(&SintaxisError{
+			ErrorConLinea: ErrorConLinea{
+				Mensaje: "Se esperaba un salto de línea después de ':'",
+				Linea:   &lineaSi,
+			},
+		})
+	}
+
+	indentacionSinoCond := indentacionDeToken(p.tokenActual())
+	if indentacionSinoCond < 0 {
+		panic(&SintaxisError{
+			ErrorConLinea: ErrorConLinea{
+				Mensaje: "Se esperaba un salto de línea con indentación después de ':'",
+				Linea:   &lineaSi,
+			},
+		})
+	}
+	p.esperado(NUEVA_LINEA)
+
+	bloqueSinoCond := []*Nodo{}
+	for p.tokenActual() != nil {
+		token := p.tokenActual()
+		if token.Tipo == NUEVA_LINEA {
+			if indentacionDeToken(token) < indentacionSinoCond {
+				break
+			}
+			p.tokenSiguiente()
+			continue
+		}
+		if token.Tipo == PALABRA_CLAVE && (token.Valor == "sino" || token.Valor == "demas") {
+			break
+		}
+		sent := p.parsearSentencia(nil)
+		if sent == nil {
+			break
+		}
+		bloqueSinoCond = append(bloqueSinoCond, sent)
+	}
+
+	// Clave del fix original: seguir buscando más 'sino'/'sino si' o un
+	// 'demas' final en vez de dejar la rama sino de este nodo vacía y perder
+	// el resto de la cadena.
+	bloqueSinoAnidado := p.parsearClausulaSino(lineaSi)
+
+	nodoSinoSi := NewNodo("SI", nil, lineaSi).
+		AgregarHijo(condicionSino).
+		AgregarHijo(NewNodo("BLOQUE_SI", nil, lineaSi).AgregarHijo(bloqueSinoCond...)).
+		AgregarHijo(NewNodo("BLOQUE_SINO", nil, lineaSi).AgregarHijo(bloqueSinoAnidado...))
+
+	return []*Nodo{nodoSinoSi}
 }
 
 // parsearIntentar parsea una estructura intentar-capturar-finalmente
@@ -1324,7 +1374,36 @@ func (p *Parser) parsearAtomo() *Nodo {
 			p.esperado(PARENTESIS)
 			return NewNodo("LLAMADA", valor, linea).AgregarHijo(argumentos...)
 		}
-		return NewNodo("IDENTIFICADOR", valor, linea)
+		panic(&SintaxisError{
+			ErrorConLinea: ErrorConLinea{
+				Mensaje: fmt.Sprintf("Se esperaba una expresión, pero se encontró la palabra reservada '%s'", valor),
+				Linea:   &linea,
+			},
+		})
+
+	case TIPO_DATO:
+		valor := token.Valor
+		// Llamada a función de conversión: cadena(x), decimal(x), entero(x), etc.
+		if p.tokenSiguientePeek() != nil && p.tokenSiguientePeek().Tipo == PARENTESIS && p.tokenSiguientePeek().Valor == "(" {
+			p.esperado(TIPO_DATO)
+			p.esperado(PARENTESIS)
+			argumentos := []*Nodo{}
+			if p.tokenActual() != nil && !(p.tokenActual().Tipo == PARENTESIS && p.tokenActual().Valor == ")") {
+				argumentos = append(argumentos, p.parsearArgumento())
+				for p.tokenActual() != nil && p.tokenActual().Tipo == COMA {
+					p.esperado(COMA)
+					argumentos = append(argumentos, p.parsearArgumento())
+				}
+			}
+			p.esperado(PARENTESIS)
+			return NewNodo("LLAMADA", valor, linea).AgregarHijo(argumentos...)
+		}
+		panic(&SintaxisError{
+			ErrorConLinea: ErrorConLinea{
+				Mensaje: fmt.Sprintf("Se esperaba una expresión, pero se encontró la palabra reservada '%s'", valor),
+				Linea:   &linea,
+			},
+		})
 
 	case IDENTIFICADOR:
 		valor := token.Valor

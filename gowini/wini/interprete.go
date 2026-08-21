@@ -371,7 +371,6 @@ func (i *Interprete) definirFuncion(nodo *Nodo) {
 		"parametros":      parametros,
 		"predeterminados": predeterminados,
 		"cuerpo":          cuerpo,
-		"docstring":       "", // En Go no tenemos docstring directamente
 	}
 }
 
