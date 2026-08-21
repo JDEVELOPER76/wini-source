@@ -1,0 +1,13 @@
+{
+  "name": "wini-terminal-server",
+  "version": "1.0.0",
+  "description": "Servidor local que expone una terminal real (bash/powershell) por WebSocket para el Editor Wini",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "node-pty": "^1.0.0",
+    "ws": "^8.18.0"
+  }
+}
